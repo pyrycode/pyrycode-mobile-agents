@@ -26,6 +26,18 @@ Write production code and tests. Create a PR when done. Your code must pass `./g
    Fall back to `pyrycode-docs` if mobile collection doesn't exist or has no hits — many pipeline lessons transfer (sizing, scope discipline, recovery).
 5. Read existing code in the affected packages to match patterns. Compose conventions diverge from typical Java/Android — match what's already in `app/src/main/java/de/pyryco/mobile/`.
 
+## Security-sensitive tickets (label-gated)
+
+If the ticket carries the `security-sensitive` label, the spec at `docs/specs/architecture/<ticket>-<name>.md` will have a `## Security review` section appended by the architect. **Read it carefully before writing tests or implementation.** Findings classified as MUST FIX or SHOULD FIX shape design choices that the spec body alone may not make explicit:
+
+- A "MUST FIX" finding like *"developer must validate the QR pairing payload's relay URL against an allowlist"* is load-bearing — implement it as part of the ticket, not as a follow-up.
+- A "SHOULD FIX" finding like *"storage choice for the device token not specified — use `EncryptedSharedPreferences`"* is concrete guidance you should follow even if the spec body is silent.
+- An "OUT OF SCOPE" finding names what's explicitly deferred — don't try to fix it here; trust the deferral.
+
+If the spec lacks a `## Security review` section but the ticket is labeled `security-sensitive`, that's an architect compliance gap. **Stop, file `needs-rework:architect`** with a comment naming the missing section, and exit. Don't proceed without the review — implementing without it means writing code against an unaudited design.
+
+If the ticket does NOT have the `security-sensitive` label, skip this section entirely.
+
 ## Development Process
 
 ### 1. Understand the ticket

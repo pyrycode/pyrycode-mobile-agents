@@ -81,6 +81,27 @@ Review the PR diff. Identify issues. Make a PASS/FAIL decision.
 - **No commented-out code** or `Log.d`/`println` debug calls left behind.
 - **lint clean** — `./gradlew lint` should not report new errors (warnings reviewed case-by-case).
 
+## Security-sensitive PRs (label-gated)
+
+If the ticket carries the `security-sensitive` label, two extra obligations apply BEFORE writing your normal review:
+
+1. **Verify the architect ran the security-review pass.** The spec at `docs/specs/architecture/<ticket>-<name>.md` MUST contain a `## Security review` section with a verdict (PASS / outstanding-items) and a findings list. If it's missing, the architect skipped a required step. **Add `needs-rework:architect` label** with a comment naming the missing section, and STOP — do not proceed to review the diff. The spec must be re-issued with the security-review section before the implementation can be evaluated.
+
+2. **Apply security goggles to the diff.** In addition to the normal Review Criteria, walk these patterns:
+   - **Tokens / secrets in diff** — added `Log.d` / `Timber` lines that print tokens? Toast/Snackbar messages that leak headers? Crashlytics breadcrumbs / Sentry events that capture sensitive payloads? Verbose `println` in release builds?
+   - **Storage** — new file writes outside `Context.filesDir`? Sensitive data in plain `SharedPreferences` instead of `EncryptedSharedPreferences`? Sensitive data in Room without SQLCipher? `File.exists()` then `File.inputStream()` on caller-controlled paths (TOCTOU)? Path concatenation without `canonicalPath` boundary check?
+   - **Inter-process / Android** — newly exported `Activity` / `Service` / `BroadcastReceiver` without justification? Missing `android:exported="false"` on internal components? Deep-link `<intent-filter>` accepting attacker-controlled hosts? `PendingIntent` without `FLAG_IMMUTABLE` (mandatory on API 31+)?
+   - **Subprocess calls** — `Runtime.exec` / `ProcessBuilder` in production code at all (almost always wrong on Android)? Native code via JNI without input-shape validation?
+   - **Crypto** — `kotlin.random.Random` / `java.util.Random` where `SecureRandom` should be used? Hand-rolled crypto? `==` / `String.equals` against secrets where `MessageDigest.isEqual` should be used?
+   - **Network** — `OkHttpClient.Builder()` without explicit timeouts? `ConnectionSpec.COMPATIBLE_TLS` (downgrades TLS)? Missing certificate pinning on the relay endpoint without spec justification? Missing input-size cap on WebSocket frames?
+   - **`@SuppressLint` / `@Suppress` in security paths** — every suppression on a security-sensitive file needs justification in the PR description.
+   - **`./gradlew lint` clean** — no new lint errors. `dependencyCheck` (if configured) must be green.
+   - **Implementation matches the spec's Security review findings** — if the architect noted "MUST FIX: developer must validate the QR pairing payload's relay URL against an allowlist," verify the diff actually does that.
+
+If you find a security issue not addressed in the spec's Security review section, that's a FAIL with `needs-rework:architect` (the architect's review missed it) — NOT `needs-rework:developer`. The architect bears responsibility for the design pass; the developer bears responsibility for matching the spec.
+
+If the ticket does NOT have the `security-sensitive` label, skip this section entirely — go to Severity Levels.
+
 ## Severity Levels
 
 - **MUST FIX** — blocks merge. Hardcoded colors / non-theme typography, `!!` in production, missing `contentDescription` on interactive elements, recomposition correctness bugs (unstable lambdas in heavy lists), `GlobalScope` / `runBlocking` in production, `android.*` imports in `data/`, missing tests on new logic.
