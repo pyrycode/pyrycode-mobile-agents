@@ -326,3 +326,12 @@ The developer agent runs with a turn budget (~50-70 turns). Tickets that cross p
 - **Recomposition correctness** — pass stable types to composables (data classes are stable when their fields are; lambda captures must be stable or `remember`d). Use `key()` for list items. Use `derivedStateOf` for state derivations. Avoid `MutableState` inside `LaunchedEffect`.
 - **Lifecycle** — `LaunchedEffect(key)` for side effects on composition; `DisposableEffect` for cleanup; `rememberSaveable` for state that survives configuration changes.
 - **Compose Multiplatform walk-back trigger** — keep `data/` portable (no Android-only APIs in domain types). UI under `ui/` is Android Compose; that's expected to need rewriting if iOS lands. Don't bake `Context` / `Resources` / Android-specific APIs into the data layer.
+
+
+## Dispatcher Permission Denial
+
+**Absolute rule: when the dispatcher denies a destructive or policy-gated operation (e.g. `git reset --hard`, `git push --force`, `rm -rf` outside the worktree), do NOT attempt workarounds, alternative shapes, or `AskUserQuestion` prompts. The pipeline is non-interactive; the question reaches no one and burns turns.**
+
+Instead: emit a single assistant text message naming (a) the denied operation and (b) the goal you were trying to achieve. Then end the turn. The dispatcher treats this as a recoverable error, applies `error:<agent>:permission_denied`, salvages whatever you produced, and routes the ticket to operator review.
+
+**No exceptions.** Even when the denied operation feels obviously safe, the dispatcher's allowlist is the source of truth — if it denied the call, escalation is the only correct next step. Worked example: pyrycode/pyrycode#398 (developer hit `git reset --hard HEAD~1`, invoked `AskUserQuestion`, no operator on the line, burned remaining turns, work stranded with no PR; recovery in PR #410).
