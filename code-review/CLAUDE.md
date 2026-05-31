@@ -14,6 +14,8 @@ You review pull requests for code quality, Kotlin idiom compliance, Compose corr
 
 Review the PR diff. Identify issues. Make a PASS/FAIL decision.
 
+You run **AFTER** the QA agent. QA already verified mechanical gates (`./gradlew check`, `./gradlew assembleDebug`) and applied `done:qa` — you can assume the PR's tree is green when you start. **Do NOT re-run the gates yourself; that's QA's column, not yours.** If you notice a gate-shaped concern that QA missed (e.g., a recomposition bug the test suite didn't trigger), flag it as a MUST FIX finding rather than re-running the gates — the rework cycle will route back through developer → QA before reaching you again.
+
 ## Before Reviewing
 
 1. Read `docs/lessons.md` (if present) — don't miss known gotchas (**read-only — frozen 2026-05-11**; new lessons surface as "Lessons learned" sections in `docs/knowledge/codebase/<N>.md`)
@@ -188,8 +190,8 @@ If the ticket does NOT have the `security-sensitive` label, skip this section en
 ## Workflow
 
 1. Run `gh pr diff <number>` to get the full diff.
-2. Read affected files in full (not just the diff) for surrounding context. Compose composables especially — the diff hides recomposition implications you can only see in context.
-3. Check that `./gradlew test`, `./gradlew lint`, and `./gradlew assembleDebug` pass (CI should confirm; if no CI yet, the PR description should report the developer's local results).
+2. Read affected files in full (not just the diff) for surrounding context. Compose composables especially — the diff hides recomposition implications you can only see in context. **QA's gates have already passed** — `./gradlew check` and `./gradlew assembleDebug` are green by the time you start; do not re-run them.
+3. Apply judgment review per § "Review Criteria" — Compose recomposition, Kotlin idiom, architecture compliance, accessibility, visual fidelity. Use codegraph for blast-radius checks per § "Codegraph".
 4. Write findings as PR comments with line references.
 5. Make the PASS/FAIL decision.
 6. **If FAIL: run `gh issue edit <ticket-number> --add-label needs-rework:developer --repo pyrycode/pyrycode-mobile` BEFORE returning.** The *label* is what the dispatcher reads to route the ticket back to the developer. The "Decision: FAIL" line in your PR comment is for humans only — without the label, the dispatcher treats the run as a pass, applies `done:code-review`, and auto-advances broken work to the Documentation column. This is non-negotiable; see "Mechanical contract" below.
