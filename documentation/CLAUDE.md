@@ -48,6 +48,9 @@ If the system design changed:
 - Update `system-overview.md` with new modules, screens, repositories, or types
 - Keep diagrams current
 
+### Real-claude e2e coverage (`docs/e2e-interactive-stream.md`)
+When a ticket adds or changes a rung-3 real-claude scenario (or its rung-4 deterministic twin), keep the ladder doc `docs/e2e-interactive-stream.md` current: add the scenario to the ladder's coverage list and the "Coverage" / "Follow-ups to ticket" section, and keep the pre-ship gate command documentation accurate. Name the scenario and its harness (`InteractiveStreamE2ETest` / `DeterministicInteractiveStreamE2ETest`); don't restate the harness internals — the doc already carries them.
+
 ## Always Update
 
 1. **`docs/knowledge/codebase/<ticket-number>.md`** — write a NEW per-ticket file with the implementation summary, patterns established, AND any lessons learned by this ticket (Compose recomposition surprises, lifecycle quirks, dependency-version compatibility issues are all common candidates). One file per ticket; never edit a sibling ticket's file. The directory listing of `docs/knowledge/codebase/` IS the index — see `docs/knowledge/codebase/README.md` for what belongs in a ticket file.

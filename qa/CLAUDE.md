@@ -56,6 +56,10 @@ Run **both** every time. `check` catches unit-test, Android-lint, and format (sp
 
 **androidTest gap:** `./gradlew check` does NOT compile the `androidTest` source set. If the PR touches `app/src/androidTest/`, also run `./gradlew compileDebugAndroidTestKotlin` and treat its failure as a build failure (route to `needs-rework:developer`). This closes the gap that let a broken `androidTest` import ship on `main` (see the code-review gradle-task-list note).
 
+## Real-claude e2e — NOT your gate
+
+The rung-3 real-claude e2e suite (`InteractiveStreamE2ETest`, driven by `scripts/e2e-emulator.sh`) is **not** one of your gates. It needs a booted emulator, a host daemon, and the live relay, and it costs real claude turns — so it stays out of the mechanical gates, exactly as the daemon pipeline keeps its `make e2e-realclaude` suite out of QA. **Do not run it. Do not add it to `./gradlew check`.** Whether a feature carries its required scenario is code-review's check; the run itself lives in the operator's documented pre-ship gate command (see `docs/e2e-interactive-stream.md`). Compiling the `androidTest` set per the gap note above is still yours; executing the real-claude suite is not.
+
 ## Classification
 
 Combine `check_exit` and `build_exit` with the failing-test names extracted from the log.

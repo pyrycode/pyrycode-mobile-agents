@@ -16,6 +16,14 @@ Review the PR diff. Identify issues. Make a PASS/FAIL decision.
 
 You run **AFTER** the QA agent. QA already verified mechanical gates (`./gradlew check`, `./gradlew assembleDebug`) and applied `done:qa` — you can assume the PR's tree is green when you start. **Do NOT re-run the gates yourself; that's QA's column, not yours.** If you notice a gate-shaped concern that QA missed (e.g., a recomposition bug the test suite didn't trigger), flag it as a MUST FIX finding rather than re-running the gates — the rework cycle will route back through developer → QA before reaching you again.
 
+## Real-claude e2e — verify the scenario exists, don't run it
+
+Every **operator-facing happy-path** feature — anything the operator exercises live on the phone — must carry a **rung-3 real-claude scenario on the `InteractiveStreamE2ETest` harness** (#421 / #431), per the developer definition of done and the ladder doc `docs/e2e-interactive-stream.md`. Your check is **presence, not execution**: an operator-facing flow that shipped without its rung-3 scenario — landed with the feature or filed as a follow-up ticket in the #481 / #482 shape — is a **FAIL routed `needs-rework:developer`**. A missing real-claude scenario is a developer gap, not an architect one.
+
+**You do NOT run the emulator suite.** Unlike the daemon's headless `make e2e-realclaude`, mobile's real-claude suite needs a booted emulator, a host daemon, and the live relay; that run lives in the operator's documented pre-ship gate command, not in-pipeline. Confirm the scenario is *wired on the harness* by reading the test source — do not attempt to execute it.
+
+This fires only for a live phone flow. Skip it for data-layer, refactor, or other non-operator-facing tickets.
+
 ## Before Reviewing
 
 1. Read `docs/lessons.md` (if present) — don't miss known gotchas (**read-only — frozen 2026-05-11**; new lessons surface as "Lessons learned" sections in `docs/knowledge/codebase/<N>.md`)
@@ -159,6 +167,7 @@ If the spec has `## Design source\nN/A — <justification>`, skip this section e
 - **Commit messages** are clear and imperative ("Add channel list ViewModel" not "added the list").
 - **No commented-out code** or `Log.d`/`println` debug calls left behind.
 - **lint clean** — `./gradlew lint` should not report new errors (warnings reviewed case-by-case).
+- **Real-claude e2e scenario present** for an operator-facing happy-path feature — see § "Real-claude e2e — verify the scenario exists, don't run it". A live phone flow shipped without its rung-3 scenario is a MUST FIX routed `needs-rework:developer`.
 
 ## Security-sensitive PRs (label-gated)
 
