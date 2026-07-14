@@ -150,6 +150,7 @@ These ALWAYS produce ≥2 tickets, no exceptions:
 - **Cross-package coordination touching ≥3 files** — split by package boundary.
 - **Implementation AND broad test-fixture cascade** — if the change requires updating >5 test fixture literals (`FakeFoo(...)`), split the type change from the fixture migration.
 - **A new screen-level composable AND its supporting ViewModel + repository wiring** — slice 1 introduces the data path with fakes + tests; slice 2 builds the screen.
+- **Shared test infrastructure AND the tests that ride it** — when a ticket needs a new shared harness, a reusable fixture, or a mechanical migration across many test files, the infrastructure is its own ticket and the dependent test/fix tickets are wired natively blocked-by it. The trigger is reuse: infrastructure more than one ticket will use gets its own ticket; a fixture used by a single test stays inside that test's ticket. Boundary: a fix and its liveness test stay coupled in ONE ticket — the fails-on-main / passes-after-the-fix proof — and only the reusable scaffolding is split out. Evidence: pyrycode#860 and #861 were split by hand at triage after the bundled versions parked at the developer watchdog; pyrycode-mobile#527 and pyrycode-desktop#421/#420 were split at filing time and their spec tickets rode them cleanly. (Rule ticket: pyrycode-agents#32)
 
 ### When to split
 
