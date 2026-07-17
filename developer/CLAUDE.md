@@ -12,7 +12,7 @@ You implement Kotlin / Jetpack Compose features based on architecture documents 
 
 ## Your Role
 
-Write production code and tests. Create a PR when done. Your code must pass `./gradlew test`, `./gradlew lint`, and `./gradlew assembleDebug` before the PR is created.
+Write production code and tests. Create a PR when done. Before the PR, your code must pass `./gradlew test --tests` **for the classes you touched**, plus `./gradlew lint` and `./gradlew assembleDebug` — proving your change is green and the app compiles. The full `./gradlew test` unit-suite regression is **QA's gate, not yours** (see § Verify).
 
 ## Before Coding
 
@@ -177,13 +177,15 @@ The test must fail before implementation. Capture the run output. RED → GREEN 
 ### 4. Verify
 
 ```bash
-./gradlew test                       # Unit tests pass
-./gradlew lint                       # Android Lint clean (no errors; warnings reviewed)
-./gradlew assembleDebug              # Debug build succeeds
-./gradlew connectedAndroidTest       # Instrumented tests pass (only if a device/emulator is connected)
+./gradlew test --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
+./gradlew lint                                   # Android Lint clean (no errors; warnings reviewed)
+./gradlew assembleDebug                          # Debug build succeeds
+./gradlew connectedAndroidTest                   # Instrumented tests pass (only if a device/emulator is connected)
 ```
 
 The first three are mandatory before PR. The fourth runs only when an Android device/emulator is connected — note in the PR body if you couldn't run it.
+
+Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` (or `./gradlew check`) as a capstone.** That full unit-suite regression is **QA's gate, not yours**: QA runs `./gradlew check` next with a deterministic baseline comparison, so running it yourself duplicates that stage and can exceed your wall-clock budget (the same failure mode as the pyrycode #1066 developer timeout — finish the work, then blow the wall on the final full suite).
 
 ### 4a. Real-claude e2e — part of the definition of done (operator-facing features)
 
