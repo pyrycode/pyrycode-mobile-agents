@@ -123,6 +123,10 @@ The line count covers production code. Tests scale roughly linearly with it (TDD
 
 These are mechanical. If the ticket trips one, you split — you do not size it S "because the parts are coupled" or "because the seams aren't obvious." Couple-sounding work splits cleanly more often than not; the architect's spec on each child surfaces seams the parent body couldn't.
 
+**Every red line is a ceiling, not a shape to fill.** Write the acceptance criteria the ticket actually needs — one per distinct observable behaviour it adds — and stop. A ticket that needs two gets two. Padding to five makes the ticket read bigger than the work without pinning anything more.
+
+**This is not tidiness, because the architect sizes from the body you wrote.** A body inflated to the ceiling measures as an oversized ticket, gets split, and each child written back up to the ceiling measures oversized again. Measured 2026-08-24 over the last 100 closed tickets in this repo: **56 of the 87 refined ones carry exactly five acceptance criteria**, roughly two in three, against a median body of 4359 characters. That is the mildest reading of the four active forks — `pyrycode/pyrycode` and `pyrycode-desktop` both sit at 82% — so this is a drift to arrest rather than a fire. The loop it feeds was traced on `pyrycode/pyrycode` #1714, which became four tickets through three rounds of splitting in a single morning, with each child's body longer than the parent it was cut from.
+
 **Architect can override your size downward (S → XS) but cannot bump up.** M is not on the architect's lattice either. If the architect identifies oversized work, they route back via `needs-rework:po` with a split proposal — never bump to M.
 
 When you and the architect independently arrive at the same size, that's two checks and a stronger signal. When you disagree, the architect's view wins because they've sketched the actual design surface.
