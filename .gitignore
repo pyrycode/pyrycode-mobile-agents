@@ -14,3 +14,9 @@ logs/
 # Codegraph index (lives in target repo, but stray dirs sometimes
 # end up here during dev; keep ignored just in case)
 .codegraph/
+
+# Pre-submodule dispatcher artifact (a tracked node_modules tree), removed 2026-09-05
+dispatch/
+
+# Manual .env backups (same secrets as .env — never commit)
+.env.bak-*
