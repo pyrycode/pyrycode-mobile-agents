@@ -374,7 +374,7 @@ This is your complete verification gate. Run exactly these:
 ./gradlew compileDebugAndroidTestKotlin          # Only when you touched app/src/androidTest/
 ```
 
-Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
+Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
 
 Same rule for the emulator tiers (`scripts/e2e-emulator.sh`, `scripts/e2e-preship-gate.sh`): they are **not yours to run**. On this fork the dispatcher's automatic real-claude gate is not configured, so a ticket labelled `needs-real-claude` parks in Inbox after verification for the operator's live run.
 
@@ -514,7 +514,7 @@ If you write "this needs a split" in a comment but don't add the label, **the ti
 ./gradlew connectedAndroidTest            # Instrumented tests (device required; not your gate)
 ```
 
-The full `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` set is the verifier's gate, run by the dispatcher before the verifier spawns. Don't run the full suites yourself — see § B2.
+The full `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` set is the verifier's gate, run by the dispatcher before the verifier spawns. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. Don't run the full suites yourself — see § B2.
 
 ## Dispatcher Permission Denial
 

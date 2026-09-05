@@ -60,7 +60,7 @@ When a ticket adds or changes a rung-3 real-claude scenario (or its rung-4 deter
 
     **Evergreen, not append-only.** When this ticket invalidates something the overview already says, correct it in place. A stale paragraph is worse than a missing one.
 
-    **Split before you write, when the document you are about to touch is over 50000 bytes.** The dispatcher tells you which ones are, at the end of your prompt. This is not deferrable housekeeping: search cuts a document into roughly 900-token chunks and can only prefer a heading boundary when one falls near the cut, so a document whose sections dwarf a chunk gets cut at paragraph breaks, is not retrievable at all, and a lesson folded into it is a lesson lost. Cut at `##` headings, and where a `##` section is itself over the cap cut it at its `###` headings. Keep the parent at its own path, since other agent prompts name it and the rest of the tree links to it, and leave it as a map: a short lead paragraph and a linked list of the children. A section under 3000 bytes stays in the parent. Retarget any inbound `#anchor` link that pointed at a section you moved, and add every child to `docs/knowledge/INDEX.md`. Three overviews were already over the cap when this rule reached this fork on 2026-09-05, the largest at 164KB, so expect the split order on your first runs in those areas.
+    **Split before you write, when the document you are about to touch is over 50000 bytes.** The dispatcher tells you which ones are, at the end of your prompt. This is not deferrable housekeeping: search cuts a document into roughly 900-token chunks and can only prefer a heading boundary when one falls near the cut, so a document whose sections dwarf a chunk gets cut at paragraph breaks, is not retrievable at all, and a lesson folded into it is a lesson lost. Cut at `##` headings, and where a `##` section is itself over the cap cut it at its `###` headings. Keep the parent at its own path, since other agent prompts name it and the rest of the tree links to it, and leave it as a map: a short lead paragraph and a linked list of the children. A section under 3000 bytes stays in the parent. Retarget any inbound `#anchor` link that pointed at a section you moved, and add every child to `docs/knowledge/INDEX.md`. `scripts/docs-guard.sh` fails on a file left over the cap.
 
     Sources you draw from, in order of usefulness:
     - the PR body's optional **Lessons learned** section, if present (the builder flags non-obvious surprises there)
@@ -92,24 +92,19 @@ You (and only you) write to `docs/knowledge/INDEX.md`. The other agents in eithe
 - **Link generously.** Cross-reference related docs, decisions, and features.
 - **Don't document process.** This is about the product, not about what the pipeline did.
 
-## Before you commit — run the docs guard by hand
+## Before you commit — run the docs guard
 
-This fork has no checker script yet: the parent repository enforces these rules with a Go program under `make check`, and desktop with a Node script under `npm run check:docs`, but neither is in the fork's gate list here. Until one lands, you are the guard. Run both checks and repair everything they report across the whole features tree, not only the files you just wrote:
-
-```bash
-grep -rnE '^#[0-9]' docs/knowledge/features/             # false headings
-find docs/knowledge/features -name '*.md' -size +50000c  # overviews over the cap
-```
+**Run `scripts/docs-guard.sh` and repair everything it reports across the whole features tree, not only the files you just wrote.** It enforces two rules, and both faults are ones this phase produces.
 
 **False headings.** A paragraph that wraps with a ticket reference first, so that a line begins `#623`, is read by markdown as a top-level heading. That corrupts the document outline and moves the boundaries search cuts on. Escape the hash rather than rejoining the line: `\#623` renders identically inside a paragraph and keeps the surrounding wrap width. Change nothing else, so no sentence is reworded and no ticket reference is removed.
 
-**The size cap.** Same rule and same reasoning as § Always Update, and this is where it is enforced rather than trusted.
+**The size cap.** Same rule and same reasoning as § Always Update, and the guard is where it is enforced rather than trusted.
 
 **Repair the whole tree, because the set moves.** A wrapped line introduced by one ticket's docs run can self-heal under the next one's rewrap, and a new one can appear in a file you never opened, so the file at fault is usually not the file you touched. You are the sole writer under `docs/knowledge/` and this phase is serial, so nothing else is mid-edit on a file you fix.
 
-In the parent repository the same fault turned `make check` red on `main` on 2026-09-01, every open PR inherited it, and eight verifier runs spent budget proving the red gate was not theirs before a human cleared it. Here there is no gate to go red, which means nothing catches a fault you leave behind. That is why the check is yours.
+The guard is the first entry in the fork's gate list, so a fault left behind turns the pre-verifier gates red and the ticket routes to rework. In the parent repository the same fault turned `make check` red on `main` on 2026-09-01, every open PR inherited it, and eight verifier runs spent budget proving the red gate was not theirs before a human cleared it. It is the same program as the parent's Go checker and desktop's Node script, in shell because this repo has neither toolchain.
 
-The frozen per-ticket archive is out of scope. Leave its false headings: that tree is closed to writes.
+The frozen per-ticket archive is out of the guard's scope and holds 21 false headings of its own. Leave them: that tree is closed to writes.
 
 ## Output
 
