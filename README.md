@@ -2,7 +2,7 @@
 
 Agent instructions and dispatcher infrastructure for [pyrycode-mobile](https://github.com/pyrycode/pyrycode-mobile) — the Android client for [Pyrycode](https://github.com/pyrycode/pyrycode).
 
-**Status: dormant.** Set up but not in use. Activation deferred until pyrycode-mobile reaches Phase 2 ticketing (conversation thread screen — many discrete sub-features, ticket-shaped). See the **Activation Checklist** below.
+**Status: active.** The dispatcher runs the four-role builder stage set against [board #5](https://github.com/orgs/pyrycode/projects/5) since 2026-09-05, started from the operator's terminal with `bin/pyry-start`. The **Activation Checklist** below is kept as history of the 2026-05 bring-up.
 
 ## What this is
 
@@ -20,15 +20,24 @@ Same dispatcher infrastructure, different agent prompts. Duplicate until diverge
 
 ```
 pyrycode-mobile-agents/
-├── po/CLAUDE.md              # Product Owner agent — ticket refinement + sizing + splitting
-├── architect/CLAUDE.md       # Architect agent — design specs, size enforcement
-├── developer/CLAUDE.md       # Developer agent — Kotlin/Compose implementation, test-first
-├── code-review/CLAUDE.md     # Code Review agent — Compose / Material 3 / a11y review
-├── documentation/CLAUDE.md   # Documentation agent — evergreen docs, ADRs, lessons
-├── bin/                      # pyry-start, pyry-drain, pyry-test, ...
+├── po/CLAUDE.md              # Classic set — Product Owner agent: ticket refinement + sizing + splitting
+├── architect/CLAUDE.md       # Classic set — Architect agent: design specs, size enforcement, security-review pass
+├── developer/CLAUDE.md       # Classic set — Developer agent: Kotlin/Compose implementation, test-first
+├── qa/CLAUDE.md              # Classic set — QA agent: Gradle gates, baseline comparison
+├── code-review/CLAUDE.md     # Classic set — Code Review agent: Compose / Material 3 / a11y review
+├── documentation/CLAUDE.md   # Both sets — Documentation agent: feature overviews, ADRs, the e2e ladder doc
+├── refiner/CLAUDE.md         # Builder set — the PO contract under its new name
+├── builder/CLAUDE.md         # Builder set — plan, then implement, in one warm session
+├── builder/security-review.md # Builder set — the adversarial checklist on security-sensitive plans
+├── verifier/CLAUDE.md        # Builder set — triage of red Gradle gates, then judgment review
+├── bin/                      # pyry-start, pyry-drain, pyry-status, pyry-test, ...
 ├── .env.example              # Copy to .env (gitignored)
 └── dispatcher/               # submodule → pyrycode/agent-dispatcher
 ```
+
+Two stage sets share this repo. The classic six-agent relay (po → architect → developer → qa → code-review → documentation) is the dispatcher's default. `PYRY_STAGE_SET=builder` in `.env` selects the four-role builder set (refiner → builder → verifier → documentation), piloted on pyrycode since 2026-09-01, propagated to desktop the same day and here on 2026-09-05: the builder plans and implements in one session, and the dispatcher runs `PYRY_VERIFIER_GATES` deterministically before the verifier spawns. Board #5 keeps its In Architecture and In QA columns; the builder set simply never polls them. See `.env.example` for the knobs. The classic prompts stay in the tree for rollback and are not kept in step with the builder set.
+
+The target repo is `pyrycode/pyrycode-mobile`; the `.env` sets `TARGET_REPO_PATH` to its local checkout. Because the app is Kotlin, not Go, the `.env` overrides `SALVAGE_GATES="./gradlew assembleDebug"` — the dispatcher's default gate is `go vet ./...; go build ./...`, which would fail on every Gradle build and disable salvage. Do not drop that override. Gradle finds the Android SDK in a dispatcher worktree through `ANDROID_HOME` and the JDK through `JAVA_HOME`, both inherited from the terminal that started the dispatcher; `local.properties` is gitignored and never reaches a worktree.
 
 ## Cloning
 
