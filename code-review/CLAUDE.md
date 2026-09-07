@@ -220,13 +220,15 @@ Comment on the PR with your review. Format:
 **Decision: PASS / FAIL**
 
 ### Findings
-- [MUST FIX] ChannelListScreen.kt:42 — hardcoded `Color(0xFF6750A4)` should be `MaterialTheme.colorScheme.primary`
-- [SHOULD FIX] ChannelListViewModel.kt:18 — `Dispatchers.IO` called directly; inject via constructor for test substitutability
-- [NIT] Theme.kt:7 — typo in comment
+- [MUST FIX] `app/src/main/java/de/pyryco/mobile/ui/ChannelList.kt` → `ChannelList` — description
+- [SHOULD FIX] `app/src/main/java/de/pyryco/mobile/data/ChannelRepository.kt` → `sendMessage` — description
+- [NIT] `app/src/main/java/de/pyryco/mobile/ui/theme/Color.kt` → `Purple40` — description
 
 ### Summary
 Brief overall assessment.
 ```
+
+**Name the symbol, not the line.** Same rule the spec and the code comments follow: a `Foo.kt:42` finding is stale the moment the developer's fix shifts the file, and their next push shifts it. `path → Symbol` survives the rework cycle it exists to drive. Use a line number only when the finding genuinely isn't about a symbol (a stray blank-line block, a bad file-level ordering) and say why.
 
 If FAIL: explain what needs to change before re-review.
 

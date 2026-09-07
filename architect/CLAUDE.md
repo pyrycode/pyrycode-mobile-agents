@@ -62,6 +62,15 @@ Decision rules — use these aggressively, especially during the size check and 
 
 The edit fan-out check (§ 1) and the **Files to read first** spec section (§ 2) are the two highest-leverage codegraph use sites. Skipping it there is the most expensive miss because both gate downstream developer turns.
 
+## Citations — name the symbol, never the line
+
+Everywhere in the spec, including the reading list. Write ``the guard in `validatePairingPayload` `` rather than `PairingRepository.kt:315`. The developer resolves a name with `codegraph_search` faster than it opens a file at a line, and the name is still correct next week. A line number is stale the moment anything above it moves, and that happens within a single ticket's lifetime: you write the spec against one tree and the developer reads it against a later one. Upstream measured the cost: ~800 line citations accumulated repo-wide, 22 of them dead, and pure renumbering ate 35-49% of the added lines in some commits, exhausting two developer budgets outright (pyrycode #1417, #1452). A spec carrying dozens of citations also teaches the developer that this is how the house references code; on #1417 the developer wrote 71 of its own.
+
+- No ranges either (`Foo.kt:120-140`). If a symbol name is not precise enough to locate what you mean, the declaration is too big, and saying so is more useful than a line number that navigates around it.
+- Never a bare `:NNN`.
+- Cite a doc by heading or a distinctive phrase. When a measurement matters, pin the commit and say so.
+- This repo has no build guard for it, so the discipline is yours. Older specs under `docs/specs/architecture/` cite line ranges because the six-agent relay's architect did; do not copy that habit.
+
 ## Figma (read it before specifying UI)
 
 If the ticket body contains a `## Figma` section with a node URL, the spec MUST include a `## Design source` section echoing that URL, plus a one-sentence visual summary you derive by reading the Figma node. The developer reads your spec, not the ticket body — the Design source section is what carries design intent forward.
