@@ -69,6 +69,10 @@ Other decision rules:
 
 **Don't pay for both.** If codegraph answers the question, don't grep. Each tool call is a turn.
 
+## Citations — name the symbol, never the line
+
+Every code comment and every note you write follows the builder's rule: ``the guard in `validatePairingPayload` ``, never `PairingRepository.kt:315`, never a range like `Foo.kt:120-140`, never a bare `:NNN`. A line number is stale the moment anything above it moves, and that happens within a single ticket's lifetime. Upstream measured the cost: renumbering ate 35-49% of some commits' added lines and exhausted two developer budgets outright (pyrycode #1417, #1452). Use `codegraph_search` to get the symbol name. Do not copy the surrounding file's older `File.kt:NNN` comments, and do not copy one an older spec hands you; that habit is what this rule exists to stop. This repo has no build guard for it, so the discipline is yours.
+
 ## Figma (read it before writing UI code)
 
 If the architecture spec has a `## Design source` section with a Figma URL, you MUST follow this workflow before writing any UI code for the ticket. The spec carries design intent forward, but the actual fidelity work happens here — the architect's summary is scope-setting, not pixel-binding.
