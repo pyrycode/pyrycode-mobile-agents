@@ -112,7 +112,7 @@ If the spec's `## Design source` says `N/A — <justification>`, skip this secti
    - **Components:** prefer M3 (`Button`, `OutlinedButton`, `TextButton`, `IconButton`, `Card`, `Surface`, `TopAppBar`, `LazyColumn`, `ModalBottomSheet`, `AlertDialog`). Build custom only when M3 has no equivalent.
    - **Assets:** if `get_design_context` returns localhost SVG/PNG sources for icons or logos, download them and place under `app/src/main/res/drawable/`. Do NOT pull in new icon packages; do NOT use placeholders if a localhost source is available.
 
-6. **Validate against the screenshot before opening the PR.** Run the app on emulator (or use `@Preview` composables for static screens) and visually compare against the Figma screenshot from step 3. Checklist:
+6. **Validate against the screenshot before opening the PR.** Use `@Preview` composables for static screens and inspect dispatcher-managed UI evidence for dynamic screens; a manual emulator boot is not required. Compare against the Figma screenshot from step 3. Checklist:
    - [ ] Layout matches (column/row shape, alignment, spacing, hierarchy)
    - [ ] Typography matches (font, size, weight — via M3 style)
    - [ ] Colors match (via M3 role tokens, not literal hex)
@@ -154,7 +154,7 @@ If the ticket does NOT have the `security-sensitive` label, skip this section en
 **Failing test first (RED), implementation after (GREEN), refactor.** Test-first is non-negotiable per project rules.
 
 - **Unit tests** for pure logic (data classes, mappers, `Flow` operators, ViewModel state derivations) — under `app/src/test/java/de/pyryco/mobile/`. Run with `./gradlew test`. Use `kotlinx.coroutines.test.runTest` for suspending code.
-- **Compose UI tests** for screen-level behavior — under `app/src/androidTest/java/de/pyryco/mobile/`. Run with `./gradlew connectedAndroidTest` (requires emulator/device). Use `createComposeRule()` and assertions like `onNodeWithText`, `onNodeWithContentDescription`.
+- **Compose UI tests** for screen-level behavior — under `app/src/androidTest/java/de/pyryco/mobile/`. Use `createComposeRule()` and assertions like `onNodeWithText`, `onNodeWithContentDescription`. The dispatcher runs the managed-device UI gate after the PR opens; you author the test and triage any supplied failure.
 - **Fakes over mocks** at the repository / data layer (`FakeConversationRepository` shape). MockK only for ViewModels that need fine-grained interaction verification.
 
 The test must fail before implementation. Capture the run output. RED → GREEN → REFACTOR.
@@ -186,22 +186,22 @@ The test must fail before implementation. Capture the run output. RED → GREEN 
 ./gradlew test --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
 ./gradlew lint                                   # Android Lint clean (no errors; warnings reviewed)
 ./gradlew assembleDebug                          # Debug build succeeds
-./gradlew connectedAndroidTest                   # Instrumented tests pass (only if a device/emulator is connected)
+./gradlew connectedAndroidTest                   # Optional local run; dispatcher owns routine UI execution
 ```
 
-The first three are mandatory before PR. The fourth runs only when an Android device/emulator is connected — note in the PR body if you couldn't run it.
+The first three are mandatory before PR. The dispatcher owns the routine device run and records its command, XML evidence and executed count. Do not describe a compile or unit result as device evidence.
 
 Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` (or `./gradlew check`) as a capstone.** That full unit-suite regression is **QA's gate, not yours**: QA runs `./gradlew check` next with a deterministic baseline comparison, so running it yourself duplicates that stage and can exceed your wall-clock budget (the same failure mode as the pyrycode #1066 developer timeout — finish the work, then blow the wall on the final full suite).
 
 ### 4a. Real-claude e2e — part of the definition of done (operator-facing features)
 
-**If this ticket ships an operator-facing happy-path flow — anything the operator will exercise live on the phone (a reply rendering, a tool step, a permission prompt, a session boundary, an action button that now talks to the daemon) — its definition of done includes a rung-3 real-claude e2e scenario.** This is the cross-project rule set 2026-07-08: every operator-facing flow needs a real-claude test that runs in the pre-ship gate, because the pipeline otherwise ships on unit tests, scripted e2e, and review, and nothing exercises real claude before the operator does.
+**If this ticket ships an operator-facing happy-path flow — anything the operator will exercise live on the phone (a reply rendering, a tool step, a permission prompt, a session boundary, an action button that now talks to the daemon) — its definition of done includes a rung-3 real-Claude e2e scenario.** The dispatcher runs scripted UI scenarios before verifier and the tagged live suite after verifier, so the pipeline records real-stack evidence before documentation and merge.
 
 Concretely:
 
 - **Add the scenario to the shipped rung-3 harness — `InteractiveStreamE2ETest`** (the #421 / #431 emulator + host-daemon + real-claude rig). Either land it with the feature, or split it into its own follow-up ticket in the **#481 / #482 shape** — one `@Test` scenario, sized S, `@Ignore`-gated if its signal is transient and cannot be made durable (the #482 thinking-spinner precedent).
 - **Where a scripted fixture can hold the turn/state open, also add a deterministic rung-4 twin** in `DeterministicInteractiveStreamE2ETest` (`DETERMINISTIC=1`, scripted `fakeclaude`, zero claude turns) so the flow has a re-runnable check beside the semi-deterministic real-claude one. If the state is transient with no durable artifact and no way to hold it open, the real-claude scenario stands alone (again, the #482 case).
-- **You are NOT required to RUN the emulator suite.** It needs a booted emulator, a host daemon, and the live relay, and it costs real claude turns, so it is not part of your `./gradlew` verification gate above and does not run in-pipeline. Your obligation is that the scenario EXISTS and is wired on the harness; the run itself lives in the operator's documented pre-ship gate command.
+- **You are NOT required to RUN the real-Claude suite.** It uses a managed emulator, a host daemon and the live relay, and runs after verifier only for `needs-real-claude` tickets through `python3 scripts/android-test-gate.py live`. Your obligation is that the scenario EXISTS and is wired on the harness. Add a deterministic twin when the fixture can hold the state open; triage any dispatcher result supplied for your change.
 - **The ladder doc `docs/e2e-interactive-stream.md` is the source of truth** for the rung vocabulary, the harness seams, and how the suite runs. Read it before adding a scenario, and reference it rather than duplicating its content.
 
 For a data-layer, refactor, or other non-operator-facing ticket, this section does not fire — there is no live phone flow to prove.
@@ -212,7 +212,7 @@ For a data-layer, refactor, or other non-operator-facing ticket, this section do
 - Create PR with:
   - **Summary**: one paragraph — what changed and why
   - **Issue**: `Closes #<n>`
-  - **Testing**: one-line verification (build/lint/test status; instrumented-test note if Android device wasn't connected)
+  - **Testing**: one-line verification (build/lint/test status; dispatcher UI and scripted result when supplied)
   - **Lessons learned** (optional): bulleted, only if something non-obvious surfaced. The documentation phase lifts these into `docs/knowledge/codebase/<N>.md`.
 
 The spec at `docs/specs/architecture/<N>-*.md` is the authoritative record of design decisions. Code review reads the spec, not the PR body — do not restate the spec's contents or mirror its AC list in your PR. A short PR body is the target shape; long PR bodies were a fixed-cost tail that contributed to upstream max_turns salvages (pyrycode #471, #478).
@@ -283,8 +283,8 @@ If routed back from code review:
 ./gradlew test --tests "de.pyryco.mobile.data.SessionRepositoryTest"  # Single test class
 ./gradlew lint                       # Android Lint
 ./gradlew assembleDebug              # Build debug APK
-./gradlew installDebug               # Install on connected device/emulator
-./gradlew connectedAndroidTest       # Instrumented tests (device required)
+./gradlew installDebug               # Optional local install; dispatcher owns routine device execution
+./gradlew connectedAndroidTest       # Optional local run; dispatcher owns the managed-device UI gate
 ./gradlew clean                      # Clean build outputs
 ./gradlew dependencies               # Show dependency graph
 ```

@@ -50,7 +50,12 @@ The label is the contract for the builder's security-review pass — the builder
 
 Apply the `needs-real-claude` label to any ticket whose acceptance can only be proven by a run against a real, live claude behind a real pyry daemon over the live relay, rather than the fakes and the deterministic harness the rest of the pipeline uses.
 
-Why the label exists: nothing in the pipeline exercises real claude before the operator does. The pipeline ships on unit tests, the compiled-but-not-run instrumented tier, and review. Every mobile flow the operator tested live in early July 2026 had failed first, which is why the cross-project rule of 2026-07-08 says an operator-facing happy-path flow ships with a rung-3 real-claude scenario. On this repo that scenario lives on the `InteractiveStreamE2ETest` harness, driven by `scripts/e2e-emulator.sh`, and the operator's gate command is `scripts/e2e-preship-gate.sh`. The ladder doc `docs/e2e-interactive-stream.md` is the source of truth for the rung vocabulary and how the suite runs.
+Why the label exists: a live real-Claude run is a separate acceptance rung. Routine
+UI and scripted scenarios run before verifier, while this label schedules the
+post-verifier live run. The scenario lives on the `InteractiveStreamE2ETest` harness
+and the gate is `python3 scripts/android-test-gate.py live`, which wraps the existing
+live suite. The ladder doc `docs/e2e-interactive-stream.md` is the source of truth
+for the rung vocabulary and how the suite runs.
 
 Apply it when the acceptance criteria name any of:
 
@@ -58,9 +63,15 @@ Apply it when the acceptance criteria name any of:
 - A behaviour only a live claude exercises: a permission or trust prompt round-trip, reply streaming into the thread, an interrupt or queue-drop against a real turn, a session boundary, a settings round-trip that the daemon has to echo back
 - "Verify live", "against a real claude", "on the emulator against the real daemon", "on the operator machine", or an equivalent that neither `./gradlew test` nor the deterministic rung-4 twin can cover
 
-When in doubt, **apply it** — the cost of a wrongly-applied label is one operator glance in Inbox; the cost of a missing one is an unverified change merged on unit tests alone.
+When in doubt, **apply it**. A missing label can let a live acceptance requirement
+escape the post-verifier gate.
 
-The label is the contract for the dispatcher's real-claude gate. **On this fork the dispatcher's automatic gate is not configured** (`PYRY_REAL_CLAUDE_GATE_CMD` is unset), because the mobile suite needs a booted emulator, a host daemon and the live relay. So once a labelled ticket passes verification the dispatcher parks it in **Inbox** and the operator runs `scripts/e2e-preship-gate.sh` by hand before promoting it onward. The dispatcher will not close a labelled ticket that has not passed. The verifier is the backstop — it adds the label if you missed it — but by then the design is already built, so catching it at refinement is what makes the requirement shape the acceptance criteria.
+The label is the contract for the dispatcher's post-verifier real-Claude gate.
+Once a labelled ticket passes verification, the dispatcher runs
+`python3 scripts/android-test-gate.py live` before documentation and merge. A
+missing, zero-count or failed live result cannot pass. The verifier is the backstop
+and adds the label if it is missing, but applying it during refinement keeps the
+acceptance criteria explicit.
 
 **Write the scenario into the acceptance criteria when the flow is operator-facing.** A ticket that ships a reply rendering, a tool step, a permission prompt, a session boundary, or an action button that now talks to the daemon needs one criterion naming the rung-3 scenario it lands or the follow-up ticket it spawns in the #481 / #482 shape. Data-layer, refactor and non-operator-facing tickets do not.
 

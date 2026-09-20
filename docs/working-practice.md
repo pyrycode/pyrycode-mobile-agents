@@ -43,8 +43,10 @@ consumers before deciding that dependent work remains parked.
 
 Check which repository owns each acceptance criterion. Route a sibling-repository
 fix to its owner instead of splitting it into the wrong board. Check emulator,
-SDK and live-run prerequisites before promising operator-dependent proof. Separate
-runnable implementation from the operator execution that follows verification.
+SDK and live-run prerequisites before promising dispatcher-dependent proof. Agents
+author the tests and triage failures; the dispatcher owns routine UI and scripted
+execution. Separate runnable implementation from the dispatcher execution that
+follows verification.
 
 When a named mechanism is blocked, distinguish it from the acceptance intent.
 Use a reachable in-repository proof only when it preserves that intent. A compile
@@ -205,15 +207,20 @@ evidence of approval. If a new rejection occurs, stop and report it for review.
 Complete the work and checks assigned to your role. A builder with completed code,
 scoped checks and a PR reports completion with an explicit handoff of live acceptance.
 Keep `needs-real-claude` on the issue. The verifier checks the scenario and preserves
-that requirement. Pending operator execution alone is not an agent error and is never
-evidence that a live test passed. Other unfinished role work still blocks completion.
+that requirement. Before the verifier, the dispatcher runs
+`python3 scripts/android-test-gate.py ui` through the Gradle-managed Android 13
+device, then runs `python3 scripts/android-test-gate.py scripted <scenario>` for
+`ping`, `stream`, `spinner`, `tool`, `tool-failed`, `reconnect` and `replay-order`.
+The scripted suite uses zero real Claude turns. After verifier success, a labelled
+ticket runs `python3 scripts/android-test-gate.py live` before documentation and
+merge. The live gate uses the existing curated real-Claude suite.
 
-Mobile has no automatic live gate configured. The dispatcher parks labelled tickets
-in Inbox after verification. The operator runs `scripts/e2e-preship-gate.sh` with a
-booted emulator, a current test daemon and the live relay. Count executed scenarios;
-a skipped or ignored test is not proof. Read the app's `docs/e2e-interactive-stream.md`
-for the fixture, prerequisites and evidence. Do not copy credentials into agent
-contexts or change the production daemon to satisfy a test.
+Agents add the tests and triage the command and XML evidence supplied by the
+dispatcher. Missing, zero-count or failed execution is not proof of a pass. An
+ignored negative control and the transient real-Claude spinner remain manual cases.
+Pending dispatcher execution alone is not an agent error and is never evidence that
+a live test passed. Do not copy credentials into agent contexts or change the
+production daemon to satisfy a test.
 
 ## Runner contract
 

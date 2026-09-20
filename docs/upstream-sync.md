@@ -7,7 +7,11 @@ Updated 2026-09-20 from the current Pyrycode and Desktop workflow.
 - Required documentation is carried through refinement, plan, PR, review and documentation.
 - Routine Codex operations use helpers limited to the Mobile repository and board 5.
 - Kotlin, Compose, Gradle, Material 3, Figma references and mobile sizing remain in place.
-- Live emulator acceptance remains manual. Electron commands and Go gates do not apply.
+- Routine UI and scripted tests are dispatcher-owned before verification. The
+  dispatcher uses `python3 scripts/android-test-gate.py ui` and one `scripted`
+  invocation for each supported scenario. A ticket carrying `needs-real-claude`
+  runs `python3 scripts/android-test-gate.py live` after verifier success and before
+  documentation or merge. Electron commands and Go gates do not apply.
 
 The product knowledge migration must land before these roles run. The short map is
 `docs/knowledge/INDEX.md`; the full catalogue remains searchable separately.
@@ -25,3 +29,12 @@ Reference ports: Pyrycode `e37ade1`, `ab36c25`, `63a175e` and Desktop `427fbf1`,
 The cleanup fix in shared revision `386b296` preserves dirty worktrees and main-checkout files. It replaces the destructive cleanup that blocked Mobile startup.
 
 Durable lessons from the existing Mobile private-memory index were folded into the product verification topic and shared agent practice. Original memory files remain untouched as historical evidence.
+
+Shared revision `34ce97a` adds counted JUnit XML evidence. The Mobile environment
+uses it for the eight-test live suite. UI and all seven scripted scenarios run
+before verifier. The wrapper builds test binaries from `PYRYCODE_SRC` and
+`PYRYCODE_RELAY_SRC` and uses Gradle's managed device. Claude authentication is
+checked before a live run. Missing credentials produce no passing report.
+
+Keep the live baseline command unset. Its shared filter currently targets Go
+test names, so Mobile has no automatic retry or base comparison yet.
