@@ -2,7 +2,7 @@
 
 Agent instructions and dispatcher infrastructure for [pyrycode-mobile](https://github.com/pyrycode/pyrycode-mobile) — the Android client for [Pyrycode](https://github.com/pyrycode/pyrycode).
 
-**Status: active.** The dispatcher runs the four-role builder stage set against [board #5](https://github.com/orgs/pyrycode/projects/5) since 2026-09-05, started from the operator's terminal with `bin/pyry-start`. The **Activation Checklist** below is kept as history of the 2026-05 bring-up.
+**Pipeline configured.** The dispatcher uses the four-role builder stage set against [board #5](https://github.com/orgs/pyrycode/projects/5) since 2026-09-05, started from the operator's terminal with `bin/pyry-start`. The **Activation Checklist** below is kept as history of the 2026-05 bring-up.
 
 ## What this is
 
@@ -71,7 +71,7 @@ These are kept verbatim as historical learning material. The lessons (sizing, sc
 
 ## Activation Checklist
 
-When pyrycode-mobile reaches Phase 2 and the chat-screen sub-tickets can be drafted (see [project plan](https://github.com/pyrycode/pyrycode-mobile/blob/main/CLAUDE.md)), do the following before the first dispatcher run:
+Historical May 2026 bring-up checklist. These are not current startup instructions. Use [the launcher guide](bin/README.md) and [workflow sync](docs/upstream-sync.md) for the current setup.
 
 1. ~~Refactor the target-repo helper~~ — DONE upstream 2026-05-09 (`resolveTargetRepoRoot`).
 2. ~~Rename the env var override~~ — DONE upstream 2026-05-09 (`TARGET_REPO_PATH`).
@@ -93,3 +93,7 @@ Same as pyrycode/agents — private, no public license. Internal use within the 
 - [pyrycode/pyrycode-mobile](https://github.com/pyrycode/pyrycode-mobile) — the app this dispatches for
 - [pyrycode/pyrycode](https://github.com/pyrycode/pyrycode) — Pyrycode CLI / Go binary
 - [pyrycode/agents](https://github.com/pyrycode/agents) — upstream fork source
+
+## Shared workflow
+
+Claude and Codex use the same repository knowledge and role instructions. Read [shared development practice](docs/working-practice.md) and [the September workflow sync](docs/upstream-sync.md). Live emulator acceptance remains an operator gate.

@@ -4,7 +4,7 @@ This is the dispatcher and agent-prompts repo for **pyrycode-mobile**. The Kotli
 
 This repo is forked from `pyrycode/agents`. As of 2026-05-09 the dispatcher source itself lives in [`pyrycode/agent-dispatcher`](https://github.com/pyrycode/agent-dispatcher) — a separate repo consumed via git submodule at `dispatcher/`. Only the mobile-specific agent prompts (Kotlin/Compose, Material 3 token enforcement, `--repo pyrycode/pyrycode-mobile`, etc.) and `bin/` launcher scripts live in this repo.
 
-**Activation status: dormant** — set up but not running. The dispatcher waits for pyrycode-mobile to reach Phase 2 ticketing. See the activation-time notes in `dispatcher/src/dispatch.ts` header.
+**Pipeline configuration:** four-role builder stage set on board 5. Startup is an operator action. See [workflow sync](docs/upstream-sync.md) for the installed workflow and remaining execution requirements.
 
 ## Dispatcher source layout
 
@@ -52,3 +52,7 @@ Every "agent does X" rule needs a deterministic dispatcher-side safety net for X
 - **`hasOpenBlockers` predicate** — backstops architect's blocker-detection prose with a deterministic GitHub query
 
 When adding a new agent rule, ask: "what deterministic check enforces this if the agent forgets?" If there isn't one, the rule is advisory only — fine for low-cost cases, expensive for ones that ship broken work downstream.
+
+## Shared knowledge
+
+Read [shared development practice](docs/working-practice.md). Claude auto memory is disabled. Keep workflow lessons here and product lessons in the target repository.
