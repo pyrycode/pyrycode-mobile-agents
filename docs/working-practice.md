@@ -43,10 +43,10 @@ consumers before deciding that dependent work remains parked.
 
 Check which repository owns each acceptance criterion. Route a sibling-repository
 fix to its owner instead of splitting it into the wrong board. Check emulator,
-SDK and live-run prerequisites before promising dispatcher-dependent proof. Agents
-author the tests and triage failures; the dispatcher owns routine UI and scripted
-execution. Separate runnable implementation from the dispatcher execution that
-follows verification.
+SDK and live-run prerequisites before promising dispatcher-dependent proof.
+Builders run focused unit and device tests for their changes, including one
+scripted scenario when relevant. The dispatcher owns the full UI and scripted
+checks before verifier and the required real-Claude checks after verifier.
 
 When a named mechanism is blocked, distinguish it from the acceptance intent.
 Use a reachable in-repository proof only when it preserves that intent. A compile
@@ -204,6 +204,28 @@ evidence of approval. If a new rejection occurs, stop and report it for review.
 
 ## Role completion and live acceptance
 
+### Focused builder tests
+
+Builders may launch the managed API 33 device for one affected Compose test method
+or class, or run one relevant scripted scenario. Run these checks during development
+and after a repair, before handing back the PR. Follow the commands and result
+checks in [builder section B2](../builder/CLAUDE.md#b2-verify--touched-scope-only).
+This permission also applies when older ticket or product guidance only requires
+device-test compilation or assigns routine execution to the dispatcher.
+
+Run from the builder's worktree. Set `ANDROID_HOME` to the installed SDK if the
+worktree has no `local.properties`. For scripted scenarios, use the configured
+`PYRYCODE_SRC` and `PYRYCODE_RELAY_SRC` sibling sources or existing test-only binaries.
+Keep the harness's isolated test daemon identity. Do not use the production daemon.
+Use the normal approval mechanism when the sandbox blocks device execution.
+Do not bypass an approval rejection or change security settings to make tests run.
+
+Focused tests do not require copying or obtaining Claude credentials. The existing
+real-Claude restriction remains. Preserve the command's exit status and inspect
+fresh XML for the selected tests. An empty or entirely skipped run is unverified.
+
+### Dispatcher acceptance
+
 Complete the work and checks assigned to your role. A builder with completed code,
 scoped checks and a PR reports completion with an explicit handoff of live acceptance.
 Keep `needs-real-claude` on the issue. The verifier checks the scenario and preserves
@@ -215,8 +237,8 @@ The scripted suite uses zero real Claude turns. After verifier success, a labell
 ticket runs `python3 scripts/android-test-gate.py live` before documentation and
 merge. The live gate uses the existing curated real-Claude suite.
 
-Agents add the tests and triage the command and XML evidence supplied by the
-dispatcher. Missing, zero-count or failed execution is not proof of a pass. An
+Builders run focused checks and triage the command and XML evidence supplied by
+the dispatcher. Missing, zero-count or failed execution is not proof of a pass. An
 ignored negative control and the transient real-Claude spinner remain manual cases.
 Pending dispatcher execution alone is not an agent error and is never evidence that
 a live test passed. Do not copy credentials into agent contexts or change the

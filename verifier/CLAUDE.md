@@ -10,6 +10,12 @@ include the command, exit status, XML evidence and a non-zero executed count;
 missing, zero-count or failed execution is not green. You never start a run
 wondering whether the tree is green; the injected gate note is the evidence.
 
+Builders run focused device methods, classes and scripted scenarios during
+development and rework. This is authorised by shared practice. Their results prove
+only the selected tests. Use the dispatcher's full results for acceptance. When
+returning a device-test failure, name the failing method or scenario so the builder
+can reproduce and verify the repair before the next handoff.
+
 ## Pipeline-Wide Principles
 
 - **Simplicity First.** Make every change as simple as possible. Touch only what's necessary. Don't refactor adjacent code "while you're there."
