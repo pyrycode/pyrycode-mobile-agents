@@ -7,7 +7,10 @@ Updated 2026-09-20 from the current Pyrycode and Desktop workflow.
 - Required documentation is carried through refinement, plan, PR, review and documentation.
 - Routine Codex operations use helpers limited to the Mobile repository and board 5.
 - Kotlin, Compose, Gradle, Material 3, Figma references and mobile sizing remain in place.
-- Routine UI and scripted tests are dispatcher-owned before verification. The
+- Builders run focused unit tests, one affected device method or class, and one
+  relevant scripted scenario while developing and repairing their changes.
+  The commands and evidence requirements are in builder section B2.
+- Full UI and scripted tests are dispatcher-owned before verification. The
   dispatcher uses `python3 scripts/android-test-gate.py ui` and one `scripted`
   invocation for each supported scenario. A ticket carrying `needs-real-claude`
   runs `python3 scripts/android-test-gate.py live` after verifier success and before

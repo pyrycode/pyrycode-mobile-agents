@@ -353,8 +353,8 @@ Your worktree is a fresh checkout. There is no `node_modules` step here: Gradle 
 
 **Failing test first (RED), implementation after (GREEN), refactor.** Run the new tests and watch them fail for the right reason before writing a line of production code.
 
-- **Unit tests** for pure logic (data classes, mappers, wire decoding, `Flow` operators, ViewModel state derivations) — under `app/src/test/java/de/pyryco/mobile/`. Run with `./gradlew test --tests "<class>"`. Use `kotlinx.coroutines.test.runTest` for suspending code and inject dispatchers so `UnconfinedTestDispatcher` can stand in.
-- **Compose UI tests** for screen-level behaviour — under `app/src/androidTest/java/de/pyryco/mobile/`, with `createComposeRule()` and `onNodeWithText` / `onNodeWithContentDescription` / `onNodeWithTag`. You author the test and run the compile check when you touch `app/src/androidTest/`; the dispatcher runs the managed-device UI gate before verifier and supplies its XML evidence for triage. Automated setup does not require Android Studio open or a manually booted emulator.
+- **Unit tests** for pure logic (data classes, mappers, wire decoding, `Flow` operators, ViewModel state derivations) — under `app/src/test/java/de/pyryco/mobile/`. Run with `./gradlew testDebugUnitTest --tests "<class>"`. Use `kotlinx.coroutines.test.runTest` for suspending code and inject dispatchers so `UnconfinedTestDispatcher` can stand in.
+- **Compose UI tests** for screen-level behaviour under `app/src/androidTest/java/de/pyryco/mobile/`: compile them and run the affected method or class on the managed API 33 device using section B2. Iterate on failures before handing off. The dispatcher runs the full UI gate before verifier. Android Studio and a manually booted emulator are unnecessary.
 - **The emulator harness** carries two more tiers, both under `app/src/androidTest/`: rung-3 real-claude scenarios on `InteractiveStreamE2ETest` (emulator + host daemon + real claude, driven by `scripts/e2e-emulator.sh`) and their rung-4 deterministic twins on `DeterministicInteractiveStreamE2ETest` (`DETERMINISTIC=1`, scripted `fakeclaude`, zero claude turns). The ladder doc `docs/e2e-interactive-stream.md` is the source of truth for the rung vocabulary and the harness seams; read it before adding a scenario and reference it rather than restating it.
 - **Fakes over mocks** at the repository / data layer (the `FakeConversationRepository` shape). MockK only for ViewModels that need fine-grained interaction verification.
 
@@ -390,22 +390,50 @@ If you reach Phase B on a labelled ticket and the committed plan has no `## Secu
 
 ### B2. Verify — touched scope only
 
-This is your complete verification gate. Run exactly these:
+Run the checks for the code and tests you changed:
 
 ```bash
-./gradlew test --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
+./gradlew testDebugUnitTest --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
 ./gradlew lint                                   # Android Lint clean (no errors; warnings reviewed)
 ./gradlew assembleDebug                          # Debug build succeeds — also the salvage gate
 ./gradlew compileDebugAndroidTestKotlin          # Only when you touched app/src/androidTest/
 ```
 
-Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
+The aggregate `test` task does not accept `--tests` in this project. Scope `testDebugUnitTest` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
 
-Same rule for the emulator tiers: they are dispatcher-owned. The pre-verifier
-commands are `python3 scripts/android-test-gate.py ui` and one `scripted`
-invocation per scenario. A ticket labelled `needs-real-claude` runs
-`python3 scripts/android-test-gate.py live` after verifier. Read and triage the
-result instead of manually starting a device.
+**Run focused device tests while building and repairing your change.** For ordinary
+Compose UI tests, select one affected method or class from your current worktree:
+
+```bash
+./gradlew :app:pixel2Api33AtdDebugAndroidTest --rerun \
+  '-Pandroid.testInstrumentationRunnerArguments.class=fully.qualified.TestClass#testMethod' \
+  -Pandroid.testInstrumentationRunnerArguments.notPackage=de.pyryco.mobile.e2e \
+  --console=plain
+```
+
+Replace the example with the actual class and method. Omit `#testMethod` to run
+the affected class. Keep the selection narrow. The managed task boots and tears
+down its own device. `--rerun` forces fresh device execution while retaining
+upstream build caching. No Claude credential or production daemon is needed.
+
+For a change to a scripted stream scenario, run its single existing command:
+`python3 scripts/android-test-gate.py scripted <scenario>`. It builds isolated test
+binaries from the configured sibling sources and makes no real Claude calls.
+Read the shared practice for setup and approval requirements. These focused runs
+are part of development and rework, including when the dispatcher found the failure.
+
+After each repair, rerun the failing method or scenario before handing back the PR.
+Then run the affected class when the repair changes shared test setup. Inspect fresh
+XML under `app/build/outputs/androidTest-results/managedDevice/debug/pixel2Api33Atd/`.
+Confirm the selected cases actually executed without failure or skips. Record the
+command, exit status, executed count and evidence path in the PR. Compilation,
+cached results and zero-test success do not prove a repair. If setup or permissions
+block execution, report the concrete blocker and the unverified check.
+
+The dispatcher still runs the full UI suite and all scripted scenarios before
+verifier. Do not repeat those full suites as a final sweep. Its real-Claude suite
+still runs after verifier for `needs-real-claude` tickets. Keep that requirement;
+focused results prove only the selected tests and do not replace final acceptance.
 
 ### B3. Commit, push, PR
 
@@ -505,7 +533,7 @@ Either way:
 
 - Fix on the existing feature branch — your plan and your code are already there. The worktree is fresh, so the first Gradle call is cold again.
 - **Never rewrite the plan doc silently.** When a finding changes the design, append a `## Revisions` section to the plan (or a new dated entry under it): what changed, which finding drove it, what the new contract is. The verifier diffs the next push against the plan *including* its Revisions — a plan still describing the old design turns every correct fix into a false compliance finding, and a plan quietly rewritten to match the code destroys the audit trail the Phase-A commit exists to create.
-- Re-verify touched scope (§ B2), commit, push to the same branch. The updated PR re-enters the verifier's gate.
+- Re-verify touched scope in section B2, including the failing device method or scripted scenario, then commit and push to the same branch. The updated PR re-enters the verifier's full checks.
 
 ## Mechanical contract — labels are the truth, prose is for humans
 
@@ -534,13 +562,13 @@ If you write "this needs a split" in a comment but don't add the label, **the ti
 ## Build Commands
 
 ```bash
-./gradlew test --tests "de.pyryco.mobile.data.SessionRepositoryTest"   # One test class — your gate, scoped
+./gradlew testDebugUnitTest --tests "de.pyryco.mobile.data.SessionRepositoryTest"   # One test class — your gate, scoped
 ./gradlew lint                            # Android Lint — your gate
 ./gradlew assembleDebug                   # Build debug APK — your gate, also the salvage gate
 ./gradlew compileDebugAndroidTestKotlin   # androidTest compiles — yours when you touch that set
 ./gradlew spotlessApply                   # Format before committing
-./gradlew installDebug                    # Optional local install; dispatcher owns routine device execution
-./gradlew connectedAndroidTest            # Optional local run; dispatcher owns the managed-device UI gate
+./gradlew installDebug                    # Optional local install
+# Focused managed-device tests and single scripted scenarios: see section B2.
 ```
 
 The full `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` set is the verifier's gate, run by the dispatcher before the verifier spawns. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. Don't run the full suites yourself — see § B2.
