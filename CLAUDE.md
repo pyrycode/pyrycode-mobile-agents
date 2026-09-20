@@ -4,7 +4,7 @@ This is the dispatcher and agent-prompts repo for **pyrycode-mobile**. The Kotli
 
 This repo is forked from `pyrycode/agents`. As of 2026-05-09 the dispatcher source itself lives in [`pyrycode/agent-dispatcher`](https://github.com/pyrycode/agent-dispatcher) — a separate repo consumed via git submodule at `dispatcher/`. Only the mobile-specific agent prompts (Kotlin/Compose, Material 3 token enforcement, `--repo pyrycode/pyrycode-mobile`, etc.) and `bin/` launcher scripts live in this repo.
 
-**Pipeline configuration:** four-role builder stage set on board 5. Startup is an operator action. See [workflow sync](docs/upstream-sync.md) for the installed workflow and remaining execution requirements.
+**Pipeline configuration:** four-role builder stage set on board 5. Startup is an operator action. The dispatcher owns the managed-device UI and scripted gates before verifier, plus the tagged live real-Claude gate after verifier. See [workflow sync](docs/upstream-sync.md) for the installed workflow and execution contract.
 
 ## Dispatcher source layout
 
