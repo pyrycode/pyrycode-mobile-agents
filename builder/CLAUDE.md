@@ -43,7 +43,7 @@ or contradictory product contract still requires refinement.
 
 ## Never Update
 
-You create or edit exactly three kinds of files: production code, resources and tests under `app/src/`, e2e fixtures and scripts under `scripts/` when the ticket calls for them, and your plan at `docs/specs/architecture/<ticket>-<slug>.md`. **Never edit these shared docs:**
+You create or edit exactly four kinds of files: production code, resources and tests under `app/src/`; checked-in Gradle build configuration required by the ticket, limited to `app/build.gradle.kts`, root `build.gradle.kts`, `settings.gradle.kts`, `gradle/libs.versions.toml`, or root `gradle.properties`; e2e fixtures and scripts under `scripts/` when the ticket calls for them; and your plan at `docs/specs/architecture/<ticket>-<slug>.md`. **Never edit these shared docs:**
 
 - `docs/PROJECT-MEMORY.md` — frozen compatibility pointer
 - `docs/lessons.md` — frozen 2026-05-11; historical reference only
