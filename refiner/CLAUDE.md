@@ -22,7 +22,7 @@ A ticket lands in your column with a rough body — usually a one-line idea, som
 
 Downstream of you sits a single **builder** stage: one agent that plans the design, implements it in Kotlin / Jetpack Compose, and ships the PR in one session. There is no separate design stage to catch a vague ticket before code gets written, so the cold-read test below is the last cheap checkpoint before implementation dollars are spent.
 
-When you're done, the dispatcher auto-adds `done:refiner` and advances the ticket to In Development. You do not add `done:refiner` manually.
+When you're done, the dispatcher auto-adds `done:refiner` and advances the ticket to In Development. You do not add `done:refiner` manually. The one exception is the children of a split you just made: see § When to split, step 6.
 
 ## Your Run Budget
 
@@ -344,13 +344,28 @@ If a ticket combines multiple concerns, the builder proposes a split via `needs-
    - Do NOT remove the now-stale parent blocker via `removeBlockedBy` — when the parent closes, `hasOpenBlockers` ignores it (it filters to OPEN only). Leaving it is cosmetic noise and saves a mutation.
 
    **Do NOT skip this step.** Without it, dependents unblock when the parent closes (because the parent stops being OPEN) but their actual prerequisite is still in flight in a child. The dispatcher routes the dependent to the builder against missing code → retry loop → wasted dollars (same failure mode as the child→child case in step 4).
-6. Move the parent's project status to **Done**, then close the original issue with a comment summarizing the split. (The dispatcher's closed-sweep will catch you if you forget the status move, but doing it explicitly keeps the board clean immediately.)
+6. **Mark each child as refined, after you have checked it.** Add `done:refiner` to every child you created:
+   ```bash
+   gh issue edit <child-number> --repo pyrycode/pyrycode-mobile --add-label "done:refiner"
+   ```
+   The dispatcher advances any unblocked Backlog ticket carrying `done:refiner` straight to In Development, so a labelled child reaches the builder without a second refiner run. A blocked child waits in Backlog as before and advances when its blocker closes.
+
+   This is a trial, started 2026-09-21. Measured on the 11 children refined that day: every child got its own refiner run minutes after the split that wrote it, at about $3 and 5 minutes each, 23% of all pipeline spend. Those runs did find errors, and every one was an error the splitting run had just written. With no second run behind you, run this check on **each** child body before you label it:
+   - **The commit it cites is the current `main`.** Do not carry the parent's audit baseline into a child. #743 inherited a hash 20 commits behind `main`, across changes to the very files it cited.
+   - **Every symbol it points the builder at is reachable from where the builder will use it.** #743 cited a file-private function. Name the importable declaration instead.
+   - **Every package or directory it names is unambiguous.** Two `components` packages exist. Write the full path.
+   - **Any overage against the table is stated on the `Estimate:` line with its reason.** #736 had 33 call sites against a limit of ten and said nothing. The builder applies the same table and would have routed it back.
+   - **Each helper or wait the child changes still proves what it proved before.** #736 replaced a wait that implied "the list has loaded" with one that did not.
+   - **Labels are set per child, not copied from the parent:** `needs-real-claude` only where that child's own criteria need the live run, `security-sensitive` only where that child's own surface warrants it.
+
+   If a child fails a check and you cannot fix it inside this run's budget, leave `done:refiner` off that child. It then gets a normal refiner run, which is the old behaviour and always safe.
+7. Move the parent's project status to **Done**, then close the original issue with a comment summarizing the split. (The dispatcher's closed-sweep will catch you if you forget the status move, but doing it explicitly keeps the board clean immediately.)
 
 **Each child must be self-contained.** Write each child's body as if the parent never existed — full scope, full AC, its own Figma section where UI-visible, links to upstream design docs (ADRs in `docs/knowledge/decisions/`, the vault's mobile design notes, etc.). Do NOT reference parent plan sections by name; the parent's plan is throwaway context once the split happens. Each child gets its own builder run that plans from the body alone.
 
 The only tie to the parent is `Split from #N` attribution at the bottom of the body and the GitHub sub-issue link. Nothing else flows from parent to child.
 
-The new issues will get picked up by your column on subsequent dispatch cycles. Don't try to refine multiple at once in a single run.
+Children you labelled `done:refiner` in step 6 go straight to the builder. A child you left unlabelled gets picked up by your column on a later dispatch cycle.
 
 **Runtime field/option-ID resolution gotcha.** The project's Status field id and its Backlog / Inbox / Done option ids are per-project and not stable — resolve them at runtime, don't hardcode. And note: `gh issue view --json projectItems` does NOT include the project item id you need for position and status mutations — resolve it via the GraphQL `projectItems` query shown above (the `PARENT_ITEM_ID` lookup), not the `gh issue view` JSON.
 
@@ -371,7 +386,7 @@ The dispatcher will not retry; the human sees the ticket reappear in Inbox with 
 - **One concern per ticket.** "Add channel list rendering and pull-to-refresh" is two tickets.
 - **Preserve human framing.** If the inbox body has a useful turn of phrase, keep it. Don't smooth over distinctive voice in the name of "structure."
 - **Assign every requirement to its stage.** Code and test acceptance criteria belong to the builder and verifier. Put documentation requirements in a separate **Documentation handoff** section owned by the documentation stage. Preserve the requested path, section and observable wording requirement there. This includes reference documentation named by the ticket, not only package overviews. Do not drop a documentation requirement or split a code ticket merely because it also needs documentation. The documentation stage must satisfy the handoff before completion.
-- **Don't add `done:refiner` manually.** The dispatcher adds it automatically when you complete successfully without adding `needs-rework:*` or moving the ticket to Inbox.
+- **Don't add `done:refiner` manually to the ticket you were dispatched on.** The dispatcher adds it automatically when you complete successfully without adding `needs-rework:*` or moving the ticket to Inbox. The only tickets you label yourself are the children of your own split, per § When to split, step 6.
 
 ## Rework Mode
 
@@ -387,7 +402,7 @@ If a ticket was routed back to you (`needs-rework:refiner` from the builder):
 - For splits: see § Splitting.
 - For demotion: see § Demoting Back to Inbox.
 
-Do NOT create the parent issue — it already exists, you're refining what the human triaged. (Child issues from a split ARE created via `gh issue create`.) Do NOT add `done:refiner` manually — the dispatcher handles that.
+Do NOT create the parent issue — it already exists, you're refining what the human triaged. (Child issues from a split ARE created via `gh issue create`.) Do NOT add `done:refiner` manually to the dispatched ticket — the dispatcher handles that. Children of your own split are the exception (§ When to split, step 6).
 
 ## Reference
 

@@ -41,3 +41,13 @@ checked before a live run. Missing credentials produce no passing report.
 
 Keep the live baseline command unset. Its shared filter currently targets Go
 test names, so Mobile has no automatic retry or base comparison yet.
+
+## Mobile-only trial: split children skip the second refiner run (2026-09-21)
+
+The refiner labels the children of its own split `done:refiner` after a per-child
+check, so they advance to the builder without a second refiner run. This uses the
+existing shared advance rule and needs no dispatcher change. Pyrycode and Desktop
+do not carry this yet. Judge it on the first ten labelled children: compare how
+often the verifier fails them, and how often the builder routes one back to the
+refiner, against the unlabelled children before 2026-09-21. Revert the refiner
+change if either rate rises.
