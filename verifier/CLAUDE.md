@@ -522,6 +522,8 @@ Brief overall assessment.
 
 The dispatcher does NOT parse your PR comments. It reads GitHub labels. The full contract:
 
+**Never end your turn with work still running.** Run the baseline and every gate you start in the foreground, with a timeout long enough for the emulator, and read the result inside the same turn. Your run is one turn: nothing resumes it when a background command finishes. On 2026-09-22 (#782) the verifier found a regression, started the baseline UI suite in the background, wrote that it was waiting for it, and returned; no review was posted and no label added, so the clean exit counted as a pass and the ticket advanced with a red suite. Since that day the dispatcher parks a verifier run that ends without a review, a comment or a rework label as `error:verifier`, so the ticket then waits for a person instead of merging. Post the verdict before you return, every time.
+
 - **Judgment PASS:** no `done:*` and no `needs-rework:*` label from you. The dispatcher finds no `needs-rework:*`, applies `done:verifier`, and schedules the post-verifier live gate when `needs-real-claude` is present. The live result must pass before documentation and merge.
 - **Judgment FAIL:** YOU add `needs-rework:builder` BEFORE returning. The dispatcher sees it, skips `done:verifier`, and routes the ticket back.
 - **Triage: regressions / lint / build failure:** YOU add `needs-rework:builder`. Same mechanics.
