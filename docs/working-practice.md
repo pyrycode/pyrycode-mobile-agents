@@ -231,8 +231,10 @@ scoped checks and a PR reports completion with an explicit handoff of live accep
 Keep `needs-real-claude` on the issue. The verifier checks the scenario and preserves
 that requirement. Before the verifier, the dispatcher runs
 `python3 scripts/android-test-gate.py ui` through the Gradle-managed Android 13
-device for the device-only classes under `app/src/androidTest`, then runs `python3 scripts/android-test-gate.py scripted <scenario>` for
-`ping`, `stream`, `spinner`, `tool`, `tool-failed`, `reconnect` and `replay-order`.
+device for the device-only classes under `app/src/androidTest`, then runs `python3 scripts/android-test-gate.py scripted-all`: `ping`, `stream`,
+`spinner`, `tool`, `tool-failed`, `reconnect` and `replay-order` on one emulator it
+boots itself, each result named in the gate output. `scripted <scenario>` stays the
+focused command for one scenario.
 The scripted suite uses zero real Claude turns. After verifier success, a labelled
 ticket runs `python3 scripts/android-test-gate.py live` before documentation and
 merge. The live gate uses the existing curated real-Claude suite.
