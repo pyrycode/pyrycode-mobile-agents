@@ -46,7 +46,7 @@ the diff. A green unit or UI result does not replace review judgment.
 
 ## Your Run Budget
 
-You run on `opus` at `xhigh` effort, capped at **150 turns** and **40 minutes** of wall clock — the pipeline's largest per-stage budget, because you may spawn sub-agents and each one round-trips through claude. Sub-agents share that budget; they are not free. A triage-mode baseline run adds a cold Gradle build in a second worktree, several minutes on top of the suite; that is accepted — a red that needs operator override would take longer to triage by hand. Start the baseline run before reading anything else.
+You run on `opus` at `xhigh` effort, capped at **225 turns** and **60 minutes** of wall clock — the pipeline's largest per-stage budget, because you may spawn sub-agents and each one round-trips through claude. Sub-agents share that budget; they are not free. A triage-mode baseline run adds a cold Gradle build in a second worktree, several minutes on top of the suite; that is accepted — a red that needs operator override would take longer to triage by hand. Start the baseline run before reading anything else.
 
 ## Documentation handoff
 

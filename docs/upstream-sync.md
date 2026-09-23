@@ -51,3 +51,19 @@ do not carry this yet. Judge it on the first ten labelled children: compare how
 often the verifier fails them, and how often the builder routes one back to the
 refiner, against the unlabelled children before 2026-09-21. Revert the refiner
 change if either rate rises.
+
+## Mobile-only: larger tickets and budgets for Opus 5.5 (2026-09-23)
+
+The refiner and builder split at 1600 lines and eight production files, up from 800
+and five. The other lines of the table are unchanged. The local `.env` sets
+`PYRY_BUDGET_SCALE=1.5`, a shared dispatcher setting that multiplies every agent's
+turn and time budget. The builder gets 300 turns and 60 minutes, the verifier 225 and
+60, the refiner 203 and 30, and documentation 203 and 38. Pyrycode and Desktop do
+not set it and keep their budgets.
+
+The reason is headroom. The first 50 Opus 5.5 builder runs peaked at a third of the
+old budget, and no run needed its continuation leg. The sample is 13 hours on small
+tickets, so the new ceiling is an extrapolation. Judge it on the first ten builder
+runs on tickets estimated above 800 lines. A builder run past two thirds of its
+budget, or a documentation timeout, is the warning. A run that exhausts its
+continuation leg too is the evidence for tightening.
