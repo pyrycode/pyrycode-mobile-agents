@@ -299,7 +299,7 @@ Write the design to `docs/specs/architecture/<ticket>-<slug>.md`. Each plan incl
 - **Design** — package structure, key types, sealed `UiState` and `Event` shapes for any ViewModel surface, data flow, recomposition seams
 - **State + concurrency model** — which `viewModelScope` jobs, which `StateFlow`s, hot-vs-cold flow choice, dispatcher (Main/IO/Default), cancellation on screen exit and on the connection driver's background close
 - **Error handling** — failure modes (network, IO, parse, permission), result type at each layer, how the UI surfaces them (banner / dialog / silent)
-- **Testing strategy** — which behaviour is proven by unit tests (`./gradlew test`, `runTest`, fakes) and which by a Compose UI test under `app/src/androidTest/`; whether the ticket lands a rung-3 real-claude scenario or a rung-4 deterministic twin on the emulator harness (§ B1); fakes vs MockK
+- **Testing strategy** — which behaviour is proven by unit tests (`./gradlew test`, `runTest`, fakes) and which by a Compose screen test under `app/src/sharedTest/` (Robolectric, § B1), with any device-only test under `app/src/androidTest/` named and justified; whether the ticket lands a rung-3 real-claude scenario or a rung-4 deterministic twin on the emulator harness (§ B1); fakes vs MockK
 - **Open questions** — things to resolve during implementation. Resolve each one in Phase B and record the resolution in a `## Revisions` entry if it changed the design; the verifier checks that Open Questions were resolved rather than ignored.
 
 **The short plan, when the change is small.** Choose the plan's size from the change you sketched in § A1, not from the ticket's label. When the change is small and adds no new type, no new state and no new failure mode, a rename, a literal, a style retune, one property, one guard, write the short plan instead of the sections above:
@@ -320,7 +320,7 @@ Same path, committed before code, same self-check in § A5. The test is that a p
 
 **Before committing, self-check the code blocks:** any block >20 lines, or full test bodies, or code copy-pasted from an existing file → cut per § A4. Keep contract sketches; cut implementation pre-writes.
 
-**Before committing, re-count the one-ticket boundary against the written plan.** The sketch you sized in § A1 and the plan you actually wrote can differ. Re-apply the same six numbers — the file count is production source files the plan prescribes new or modified content for. "Production source files" are `*.kt` files under `app/src/main/`, **excluding** test files (anything under `app/src/test/` or `app/src/androidTest/`), `*.md` files, and the plan file itself. Count files modified AND files created.
+**Before committing, re-count the one-ticket boundary against the written plan.** The sketch you sized in § A1 and the plan you actually wrote can differ. Re-apply the same six numbers — the file count is production source files the plan prescribes new or modified content for. "Production source files" are `*.kt` files under `app/src/main/`, **excluding** test files (anything under `app/src/test/`, `app/src/sharedTest/` or `app/src/androidTest/`), `*.md` files, and the plan file itself. Count files modified AND files created.
 
 If any boundary is exceeded, the ticket is too big for `s`. Do NOT commit, and do NOT start Phase B. Instead:
 
@@ -372,7 +372,9 @@ Your worktree is a fresh checkout. There is no `node_modules` step here: Gradle 
 **Failing test first (RED), implementation after (GREEN), refactor.** Run the new tests and watch them fail for the right reason before writing a line of production code.
 
 - **Unit tests** for pure logic (data classes, mappers, wire decoding, `Flow` operators, ViewModel state derivations) — under `app/src/test/java/de/pyryco/mobile/`. Run with `./gradlew testDebugUnitTest --tests "<class>"`. Use `kotlinx.coroutines.test.runTest` for suspending code and inject dispatchers so `UnconfinedTestDispatcher` can stand in.
-- **Compose UI tests** for screen-level behaviour under `app/src/androidTest/java/de/pyryco/mobile/`: compile them and run the affected method or class on the managed API 33 device using section B2. Iterate on failures before handing off. The dispatcher runs the full UI gate before verifier. Android Studio and a manually booted emulator are unnecessary.
+- **Compose screen tests** for screen-level behaviour under `app/src/sharedTest/java/de/pyryco/mobile/`. That folder compiles into both the unit test set and the device set, so the test runs under Robolectric in `./gradlew check` on every verifier pass and on the emulator in the occasional in-depth run. Run it like a unit test, `./gradlew testDebugUnitTest --tests "<class>"`; no emulator is needed. Give the class `@RunWith(AndroidJUnit4::class)`. The product repo's `docs/knowledge/features/development-verification.md` § "Where a screen test goes" has the Robolectric settings and their two traps: the screen stays 320dp wide, and exact text measurement needs `@GraphicsMode(NATIVE)`.
+- **Device-only tests** go under `app/src/androidTest/java/de/pyryco/mobile/` only when Robolectric cannot give the test what it needs: a real input method or device shell, real pixels saved as screenshots, the Android Keystore or real on-device storage, or work on a background dispatcher the paused main clock does not drive. Say which in the plan's Testing strategy. Run them on the managed API 33 device using section B2. The dispatcher's UI gate runs every class in that folder, outside the e2e package, before verifier.
+- **A shared screen test that fails and the failure does not make sense from the code: run that one class on the emulator once as a tiebreaker**, with the B2 focused command. It fails on both: Robolectric is not the cause, so fix the code or the test. It passes only on the emulator: a Robolectric gap. Try the two documented fixes first, `DeviceConfigurationOverride.ForcedSize` for a width the test needs and `@GraphicsMode(GraphicsMode.Mode.NATIVE)` for exact text measurement. Move the class to `app/src/androidTest/` only when neither works, and record the device-only reason and the tiebreaker result in the plan's Testing strategy. "It passes on the emulator" alone is not a reason: every class moved back costs every later verifier pass emulator time.
 - **The emulator harness** carries two more tiers, both under `app/src/androidTest/`: rung-3 real-claude scenarios on `InteractiveStreamE2ETest` (emulator + host daemon + real claude, driven by `scripts/e2e-emulator.sh`) and their rung-4 deterministic twins on `DeterministicInteractiveStreamE2ETest` (`DETERMINISTIC=1`, scripted `fakeclaude`, zero claude turns). The ladder doc `docs/e2e-interactive-stream.md` is the source of truth for the rung vocabulary and the harness seams; read it before adding a scenario and reference it rather than restating it.
 - **Fakes over mocks** at the repository / data layer (the `FakeConversationRepository` shape). MockK only for ViewModels that need fine-grained interaction verification.
 
@@ -414,13 +416,15 @@ Run the checks for the code and tests you changed:
 ./gradlew testDebugUnitTest --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
 ./gradlew lint                                   # Android Lint clean (no errors; warnings reviewed)
 ./gradlew assembleDebug                          # Debug build succeeds — also the salvage gate
-./gradlew compileDebugAndroidTestKotlin          # Only when you touched app/src/androidTest/
+./gradlew compileDebugAndroidTestKotlin          # Only when you touched app/src/androidTest/ or app/src/sharedTest/
 ```
 
 The aggregate `test` task does not accept `--tests` in this project. Scope `testDebugUnitTest` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
 
-**Run focused device tests while building and repairing your change.** For ordinary
-Compose UI tests, select one affected method or class from your current worktree:
+**Run focused device tests while building and repairing a device-only test.** A
+shared screen test needs no device: `testDebugUnitTest --tests` above is its focused
+run. For a class under `app/src/androidTest`, select one affected method or class
+from your current worktree:
 
 ```bash
 ./gradlew :app:pixel2Api33AtdDebugAndroidTest --rerun \
@@ -448,8 +452,8 @@ command, exit status, executed count and evidence path in the PR. Compilation,
 cached results and zero-test success do not prove a repair. If setup or permissions
 block execution, report the concrete blocker and the unverified check.
 
-The dispatcher still runs the full UI suite and all scripted scenarios before
-verifier. Do not repeat those full suites as a final sweep. Its real-Claude suite
+The dispatcher still runs the device-only UI classes and all scripted scenarios
+before verifier, and `./gradlew check` runs every shared screen test. Do not repeat those full suites as a final sweep. Its real-Claude suite
 still runs after verifier for `needs-real-claude` tickets. Keep that requirement;
 focused results prove only the selected tests and do not replace final acceptance.
 
