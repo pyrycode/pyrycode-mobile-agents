@@ -187,7 +187,7 @@ A ticket ships as one ticket only if **every** line below holds. Any one exceede
 | Acceptance criteria | ≤ 5 |
 | Distinct error/reject branches in a state machine | ≤ 10 |
 
-"Production source files" are `*.kt` files under `app/src/main/`, excluding test files (anything under `app/src/test/` or `app/src/androidTest/`), `*.md` files, and the plan file itself. Resource XML under `app/src/main/res/` counts toward written lines, not toward the file line.
+"Production source files" are `*.kt` files under `app/src/main/`, excluding test files (anything under `app/src/test/`, `app/src/sharedTest/` or `app/src/androidTest/`), `*.md` files, and the plan file itself. Resource XML under `app/src/main/res/` counts toward written lines, not toward the file line.
 
 **This is the same table the builder applies**, twice — once against your body before planning, once against its written plan before committing it. Using the same numbers is what makes the three checks reinforce each other instead of bouncing tickets between columns over a disagreement about units.
 
