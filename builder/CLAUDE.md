@@ -31,7 +31,7 @@ When you finish successfully, the dispatcher auto-adds `done:builder` and advanc
 
 ## Your Run Budget
 
-You run on `opus` at `xhigh` effort, capped at **200 turns** and **40 minutes** of wall clock.
+You run on `opus` at `xhigh` effort, capped at **300 turns** and **60 minutes** of wall clock.
 
 Wall clock is the binding constraint more often than turns are, and a Gradle build in a fresh worktree is slower than the Node builds the pilot repos measured against. If you are approaching either cap, **commit and push what stands** — a coherent partial state on the remote beats a polished tree that never leaves the machine. Resume-in-place may continue your session with a fresh budget after an exhaustion, but never rely on it: it is capped in legs, and a leg that never comes leaves only what you pushed. Dirty worktrees are retained for recovery, but uncommitted work is not a completed deliverable. The classic way to lose a finished run is to spend the last minutes on a comprehensive test sweep that belongs to the verifier's gate (pyrycode #1066). Budget to finish, commit, and open the PR.
 
@@ -113,8 +113,8 @@ A ticket ships as one ticket only if **every** line below holds. Any one exceede
 
 | Limit | Boundary |
 |---|---|
-| Production source files created or modified | ≤ 5 |
-| Total written work (production + tests + helpers + per-branch log calls + plan-doc edits) | ≤ 800 lines |
+| Production source files created or modified | ≤ 8 |
+| Total written work (production + tests + helpers + per-branch log calls + plan-doc edits) | ≤ 1600 lines |
 | New exported types, interfaces, composables or ViewModels | ≤ 5 |
 | Consumer call sites needing simultaneous update | ≤ 10 |
 | Acceptance criteria | ≤ 5 |
@@ -122,7 +122,7 @@ A ticket ships as one ticket only if **every** line below holds. Any one exceede
 
 These are quantitative — no judgment call, no "over one line but still one ticket" escape, no "the parts are coupled" rationalization. **These same six numbers are the ones the refiner applied during refinement, and you re-check them against your written plan before committing it (§ A5).** One boundary, three enforcement points.
 
-**The line and file ceilings come from the pilot repos' recalibration of 2026-09-02, adopted here on 2026-09-05 with no builder runs of this fork's own yet.** You have 200 turns and 40 minutes for plan plus implementation. Across the first 21 builder runs on each pilot repo no run exhausted either: pyrycode's median was 60 turns and 14 minutes with a heaviest of 127 and 23, desktop's median 57 and 10 with a heaviest of 82 and 19, and the median merged PR on both added about 920 lines including plan and docs. 800 lines sits inside a two-times margin of the heaviest run seen. The old 400-line, 3-file table was set for a 135-turn, 25-minute developer, and under it the first three pyrycode #1720 children all measured over the line and shipped at a third of the builder's budget. Do not relax a line further by reasoning that you have plenty of turns: the observed failures on the old set were wall-clock and cascade-shaped, Gradle is slower than the pilots' toolchains, and the fan-out check below binds regardless of line count. A run that exhausts its budget gets one continuation leg before salvage, so a miss costs a leg rather than a parked ticket. The full measurement and the re-measure trigger are in the refiner's Sizing Guide.
+**The line and file ceilings were raised on 2026-09-23 for Opus 5.5, from 800 lines and five production files to 1600 and eight.** You have 300 turns and 60 minutes for plan plus implementation. The first 50 Opus 5.5 builder runs on this fork, from the evening of 2026-09-22, used a median of 35 turns and 4.5 minutes and a heaviest of 66 turns and 12 minutes. The largest ticket, 1298 added lines, took 52 turns and 10 minutes, where the previous model needed 115 to 145 turns and 18 to 29 minutes for tickets of about 1700 lines. No run needed its continuation leg. Refiner estimates run 1.4 to 3 times below the measured size, so a ticket at the new ceiling may land at 2500 to 4000 lines, which that pace puts near half of your budget. The 800-line, 5-file table before it came from the pilot repos' recalibration of 2026-09-02, and the 400-line, 3-file table before that was set for a 135-turn, 25-minute developer. Do not relax a line further by reasoning that you have plenty of turns: Gradle is slower than the pilots' toolchains, the verifier's checks and every rework loop grow with the ticket, and the fan-out check below binds regardless of line count. A run that exhausts its budget gets one continuation leg before salvage, so a miss costs a leg rather than a parked ticket. The full measurement and the re-measure trigger are in the refiner's Sizing Guide.
 
 **Edit fan-out check (refactor-shaped work).** Line count is a decent proxy for greenfield work but undercounts refactors where you edit many call sites in cascade. Before committing to a size, identify whether the work is refactor-shaped:
 

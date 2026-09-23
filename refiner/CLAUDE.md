@@ -33,7 +33,7 @@ When you're done, the dispatcher auto-adds `done:refiner` and advances the ticke
 
 ## Your Run Budget
 
-You run on `opus` at `xhigh` effort, capped at **135 turns** and **20 minutes** of wall clock.
+You run on `opus` at `xhigh` effort, capped at **203 turns** and **30 minutes** of wall clock.
 
 Unlike every other agent, you run **without a git worktree**, directly on the default branch of the target repo. Do not modify repository files, create commits, or write private memory. Your deliverables are GitHub issue bodies, comments, labels, and project-board mutations. You may create unique publishing body files under `/Users/juhanailmoniemi/.codex/publish/pyrycode-mobile/` for the approved helpers in the shared practice.
 
@@ -180,8 +180,8 @@ A ticket ships as one ticket only if **every** line below holds. Any one exceede
 
 | Limit | Boundary |
 |---|---|
-| Production source files created or modified | ≤ 5 |
-| Total written work (production + tests + helpers + per-branch log calls + plan-doc edits) | ≤ 800 lines |
+| Production source files created or modified | ≤ 8 |
+| Total written work (production + tests + helpers + per-branch log calls + plan-doc edits) | ≤ 1600 lines |
 | New exported types, interfaces, composables or ViewModels | ≤ 5 |
 | Consumer call sites needing simultaneous update | ≤ 10 |
 | Acceptance criteria | ≤ 5 |
@@ -213,7 +213,7 @@ This is what breaks the loop described above. When the builder sizes from prose,
 
 Count **total written work**, not production lines. Tests are the bulk of it and are not free: each test is its own edit-and-debug cycle. A ticket you'd call "100 lines of production code" is routinely 300-400 lines of total written work once tests, helper functions, and per-branch log calls land. Three upstream specs on 2026-05-16 sized by production LOC alone and came in at 541, 596, and 1071 actual lines; all three needed salvage. A Compose state machine plus ViewModel plus fakes plus per-branch log calls accumulates the same way.
 
-**The line and file ceilings come from the pilot repos' recalibration of 2026-09-02, adopted here on 2026-09-05 with no builder runs of this fork's own yet.** The 400-line, 3-file table was set for a developer at 135 turns and 25 minutes. The builder has 200 turns and 40 minutes for plan plus implementation. Across the first 21 builder runs on each pilot repo (2026-09-01 evening to 2026-09-02) no run exhausted either: pyrycode's median run used 60 turns and 14 minutes with a heaviest of 127 turns and 23 minutes; desktop's median 57 turns and 10 minutes with a heaviest of 82 and 19. The median merged PR on both added about 920 lines including plan and docs, so most tickets were already landing above the old ceiling and inside a third of the budget. 800 lines sits inside a two-times margin of the heaviest run seen on either. Line count predicts turns weakly (desktop #911 landed 1820 added lines in 47 turns, #912 landed 1310 in 82), so the ceiling bounds the tail rather than sizing the typical ticket, and the call-site and reject-branch lines still bind regardless of line count. A Gradle build in a fresh worktree is slower than a Node one, so the first mobile measurements may land higher on wall clock than the pilots did. **Re-measure after ten builder runs on this fork before moving either number:** read turns and duration from the `USAGE` block at the end of each builder log, and grep the logs for `Resume leg`. A run that exhausts a second leg is the first real evidence for tightening; do not tighten from memory of the old set.
+**The line and file ceilings were raised on 2026-09-23 for Opus 5.5, from 800 lines and five production files to 1600 and eight, and every agent's turn and time budget by half.** The builder now has 300 turns and 60 minutes. The first 50 Opus 5.5 builder runs on this fork, from the evening of 2026-09-22, used a median of 35 turns and 4.5 minutes and a heaviest of 66 turns and 12 minutes, a third of the old 200-turn, 40-minute budget. The largest ticket, 1298 added lines, took 52 turns and 10 minutes, where the previous model needed 115 to 145 turns and 18 to 29 minutes for tickets of about 1700 lines. No run needed its continuation leg. Your estimates run 1.4 to 3 times below the measured size, measured on the tickets built by 2026-09-21, so a ticket at 1600 may land at 2500 to 4000 lines; that pace puts it near half the builder's budget. The evidence is thin: 13 hours of runs, on tickets with a median of 554 lines, so the ceiling bounds the tail by extrapolation. The 800-line, 5-file table before it was the pilot repos' recalibration of 2026-09-02, adopted here on 2026-09-05. The call-site, reject-branch and exported-type lines still bind regardless of line count, and were not raised: they guard coupling and verifiability, not budget. **Re-measure after ten builder runs on tickets estimated above 800 lines before moving either number again:** read turns and duration from the `USAGE` block at the end of each builder log, and grep the logs for `Resume leg`. A run that exhausts a second leg is the first real evidence for tightening; a builder run past two thirds of its budget is the first warning. Do not tighten from memory of the old set.
 
 **No larger-tier rationalization escape.** Earlier versions of this guide allowed an M tier with a "Sized M because: <factor>" paragraph. That escape was removed 2026-05-02 after Pyrycode #45 (sized M, 5-file cross-package coordination, 10 AC) exhausted the implementation budget and required recovery. The six-agent relay's design stage carried an identical "Why M, not split" escape and it went the same way — both were rationalization paths that consistently produced budget-exhaustion failures.
 
