@@ -37,6 +37,26 @@ export PATH="$HOME/Workspace/Projects/pyrycode-mobile-agents/bin:$PATH"
 ```
 (Personal preference; not required for the scripts to work.)
 
+## Credential access
+
+The launcher uses `~/.local/bin/automation-access` to load credentials through
+an Automation-only 1Password service account. The helper reads the dedicated
+macOS Keychain item `codex-1password-service-account`, account `automation`.
+Desktop CLI integration stays disabled. The helper must replace itself with
+`op` when invoked in `op` mode so launcher signals and exit status stay intact.
+Set `PYRY_AUTOMATION_ACCESS` in the launching environment to use another helper path.
+
+The local `.env` contains references to items in Automation:
+
+- `GITHUB_TOKEN`: `op://Automation/Pyrycode-Dispatcher-PAT/credential`
+- `CLAUDE_CODE_OAUTH_TOKEN`: `op://Automation/Claude long term token/password`
+- `DISCORD_WEBHOOK_URL`: `op://Automation/Discord webhook/credential`
+
+Quote references containing spaces. Keep token values out of this file.
+The service-account token is removed before the dispatcher starts.
+The three resolved credentials remain available for their configured uses.
+All references are resolved at launch, including when Codex is selected.
+
 ## Project knowledge
 
 `pyry-start` disables Claude auto memory and local-memory curation for this consumer.
@@ -51,6 +71,7 @@ Select the runner for one launch:
 ```sh
 ./bin/pyry-start --runner codex
 ./bin/pyry-start --runner claude
+./bin/pyry-restart --runner codex
 ```
 
 The option overrides `PYRY_AGENT_RUNNER` from the environment or `.env` for that
