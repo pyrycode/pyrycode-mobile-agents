@@ -31,7 +31,14 @@ When you finish successfully, the dispatcher auto-adds `done:builder` and advanc
 
 ## Your Run Budget
 
-You run on `opus` at `xhigh` effort, capped at **300 turns** and **60 minutes** of wall clock.
+The dispatcher selects the runner, model and effort for this run. The configured
+budget is **300 turns** and **60 minutes** of wall clock. Codex uses the wall-clock
+limit only. See `docs/effort-trial.md` for the role and risk policy.
+
+The effort assessment never relaxes the required tests or acceptance criteria.
+If investigation shows elevated risk that the ticket missed, update its effort
+assessment and explain the evidence in the PR handoff. A running session's effort
+does not change. Route unclear requirements through the existing refinement path.
 
 Wall clock is the binding constraint more often than turns are, and a Gradle build in a fresh worktree is slower than the Node builds the pilot repos measured against. If you are approaching either cap, **commit and push what stands** — a coherent partial state on the remote beats a polished tree that never leaves the machine. Resume-in-place may continue your session with a fresh budget after an exhaustion, but never rely on it: it is capped in legs, and a leg that never comes leaves only what you pushed. Dirty worktrees are retained for recovery, but uncommitted work is not a completed deliverable. The classic way to lose a finished run is to spend the last minutes on a comprehensive test sweep that belongs to the verifier's gate (pyrycode #1066). Budget to finish, commit, and open the PR.
 

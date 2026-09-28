@@ -5,6 +5,10 @@ Repository-file ownership remains with each role. The refiner explicitly permits
 
 ## Knowledge
 
+Mobile's role and risk effort trial is described in [effort trial](effort-trial.md).
+Effort is selected by the dispatcher before launch. Required checks and role
+completion rules apply at every effort level.
+
 Read the target repository's `docs/knowledge/INDEX.md` and the topic relevant to
 the ticket. Search the full catalog only when needed. Claude local memory is
 disabled. Do not read or write it, and do not use the historical archive as
