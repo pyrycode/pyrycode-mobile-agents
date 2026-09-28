@@ -48,7 +48,16 @@ the diff. A green unit or UI result does not replace review judgment.
 
 ## Your Run Budget
 
-You run on `opus` at `xhigh` effort, capped at **225 turns** and **60 minutes** of wall clock — the pipeline's largest per-stage budget, because you may spawn sub-agents and each one round-trips through claude. Sub-agents share that budget; they are not free. A triage-mode baseline run adds a cold Gradle build in a second worktree, several minutes on top of the suite; that is accepted — a red that needs operator override would take longer to triage by hand. Start the baseline run before reading anything else.
+The dispatcher selects the runner, model and effort for this run. The configured
+budget is **225 turns** and **60 minutes** of wall clock. Codex uses the wall-clock
+limit only. The effort trial keeps independent verification at high effort.
+See `docs/effort-trial.md`. Sub-agents share the budget; they are not free.
+A triage-mode baseline run adds a cold Gradle build in a second worktree.
+Start the baseline run before reading anything else.
+
+Assess the implementation independently of the ticket's effort assessment.
+If a missed edge case shows elevated risk, update that assessment and explain it
+in the rework finding. Rework alone does not justify raising effort.
 
 ## Documentation handoff
 

@@ -4,6 +4,10 @@ Agent instructions and dispatcher infrastructure for [pyrycode-mobile](https://g
 
 **Pipeline configured.** The dispatcher uses the four-role builder stage set against [board #5](https://github.com/orgs/pyrycode/projects/5) since 2026-09-05, started from the operator's terminal with `bin/pyry-start`. The **Activation Checklist** below is kept as history of the 2026-05 bring-up.
 
+Mobile's [effort trial](docs/effort-trial.md) selects effort per role and ticket
+risk with Claude or Codex. The local setting is `PYRY_EFFORT_POLICY=role-risk-v1`.
+The trial keeps models and acceptance checks unchanged.
+
 ## What this is
 
 A fork of [pyrycode/agents](https://github.com/pyrycode/agents) with the per-role agent prompts rewritten for Kotlin / Jetpack Compose. As of 2026-05-09 the dispatcher source itself lives in [`pyrycode/agent-dispatcher`](https://github.com/pyrycode/agent-dispatcher), consumed via git submodule at `dispatcher/` — same WIP=1 supervisor, same GitHub Projects board flow, same recovery semantics, same JSONL replay procedure.
