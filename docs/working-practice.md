@@ -228,6 +228,12 @@ Focused tests do not require copying or obtaining Claude credentials. The existi
 real-Claude restriction remains. Preserve the command's exit status and inspect
 fresh XML for the selected tests. An empty or entirely skipped run is unverified.
 
+### Visual changes and review rounds
+
+Builder checks cover affected existing layout and keyboard tests, including untouched test files. Visible bounds and touch areas need separate evidence. Changed fields and adjacent controls need pointer taps that prove focus and action routing. Update old geometry expectations only against the current acceptance criteria, with the reason recorded on the PR.
+
+A verifier handling an understood test regression may collect independent findings from unaffected code when the PR has build evidence. It posts one combined FAIL review and keeps builder rework mandatory. It names any deferred review scope. A failed build or unclear failure can still end the review at triage. Full gates and fresh review remain required after repair.
+
 ### Dispatcher acceptance
 
 Complete the work and checks assigned to your role. A builder with completed code,
