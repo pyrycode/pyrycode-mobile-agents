@@ -111,6 +111,9 @@ export TARGET_REPO_PATH="$RESOLVED_TARGET"
 # Shared repository knowledge replaces Claude local memory for this consumer.
 export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
 export PYRY_AUTOCURATE_MEMORY=0
+# Mobile's builder needs ten more minutes for device evidence and PR handoff.
+# This overrides only its wall clock; the shared budget scale still sets turns.
+export PYRY_BUILDER_TIMEOUT_MINUTES="${PYRY_BUILDER_TIMEOUT_MINUTES:-70}"
 
 # The node binary by absolute path, so `ps` (and pyry-status) show which
 # node the dispatcher runs on. Catches the Homebrew-vs-nvm class of bug

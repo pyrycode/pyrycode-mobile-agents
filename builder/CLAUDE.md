@@ -32,7 +32,7 @@ When you finish successfully, the dispatcher auto-adds `done:builder` and advanc
 ## Your Run Budget
 
 The dispatcher selects the runner, model and effort for this run. The configured
-budget is **300 turns** and **60 minutes** of wall clock. Codex uses the wall-clock
+budget is **300 turns** and **70 minutes** of wall clock. Codex uses the wall-clock
 limit only. See `docs/effort-trial.md` for the role and risk policy.
 
 The effort assessment never relaxes the required tests or acceptance criteria.
@@ -129,7 +129,7 @@ A ticket ships as one ticket only if **every** line below holds. Any one exceede
 
 These are quantitative — no judgment call, no "over one line but still one ticket" escape, no "the parts are coupled" rationalization. **These same six numbers are the ones the refiner applied during refinement, and you re-check them against your written plan before committing it (§ A5).** One boundary, three enforcement points.
 
-**The line and file ceilings were raised on 2026-09-23 for Opus 5.5, from 800 lines and five production files to 1600 and eight.** You have 300 turns and 60 minutes for plan plus implementation. The first 50 Opus 5.5 builder runs on this fork, from the evening of 2026-09-22, used a median of 35 turns and 4.5 minutes and a heaviest of 66 turns and 12 minutes. The largest ticket, 1298 added lines, took 52 turns and 10 minutes, where the previous model needed 115 to 145 turns and 18 to 29 minutes for tickets of about 1700 lines. No run needed its continuation leg. Refiner estimates run 1.4 to 3 times below the measured size, so a ticket at the new ceiling may land at 2500 to 4000 lines, which that pace puts near half of your budget. The 800-line, 5-file table before it came from the pilot repos' recalibration of 2026-09-02, and the 400-line, 3-file table before that was set for a 135-turn, 25-minute developer. Do not relax a line further by reasoning that you have plenty of turns: Gradle is slower than the pilots' toolchains, the verifier's checks and every rework loop grow with the ticket, and the fan-out check below binds regardless of line count. A run that exhausts its budget gets one continuation leg before salvage, so a miss costs a leg rather than a parked ticket. The full measurement and the re-measure trigger are in the refiner's Sizing Guide.
+**The line and file ceilings were raised on 2026-09-23 for Opus 5.5, from 800 lines and five production files to 1600 and eight.** You have 300 turns and 70 minutes for plan plus implementation. The Mobile wall clock rose by ten minutes on 2026-09-29. The first 50 Opus 5.5 builder runs on this fork, from the evening of 2026-09-22, used a median of 35 turns and 4.5 minutes and a heaviest of 66 turns and 12 minutes. The largest ticket, 1298 added lines, took 52 turns and 10 minutes, where the previous model needed 115 to 145 turns and 18 to 29 minutes for tickets of about 1700 lines. No run needed its continuation leg. Refiner estimates run 1.4 to 3 times below the measured size, so a ticket at the new ceiling may land at 2500 to 4000 lines, which that pace puts near half of your budget. The 800-line, 5-file table before it came from the pilot repos' recalibration of 2026-09-02, and the 400-line, 3-file table before that was set for a 135-turn, 25-minute developer. Do not relax a line further by reasoning that you have plenty of turns: Gradle is slower than the pilots' toolchains, the verifier's checks and every rework loop grow with the ticket, and the fan-out check below binds regardless of line count. A run that exhausts its budget gets one continuation leg before salvage, so a miss costs a leg rather than a parked ticket. The full measurement and the re-measure trigger are in the refiner's Sizing Guide.
 
 **Edit fan-out check (refactor-shaped work).** Line count is a decent proxy for greenfield work but undercounts refactors where you edit many call sites in cascade. Before committing to a size, identify whether the work is refactor-shaped:
 
@@ -249,8 +249,8 @@ These are not dependencies, so build: adding entries next to the other ticket's 
       -f blockingIssueId="$(gh issue view <THAT> --json id -q '.id')"
    ```
 2. Post a comment on this ticket naming the dependency: *"Blocked by #N: this design needs <what #N adds> / rewrites <the same block> as #N. Will build once #N lands."*
-3. Add `needs-rework:refiner`. **Do NOT write the plan.** Your worktree should be untouched.
-4. Stop.
+3. On Codex, return `waiting_on_blocker` with the blocker number in the summary. The dispatcher verifies the GitHub relationship and applies the wait label. On Claude, add `needs-rework:refiner`.
+4. Stop. **Do NOT write the plan.** Your worktree should be untouched.
 
 Because the ticket now has an open blocker, the dispatcher treats this as a wait, not a rework: it strips the label, leaves the ticket in In Development, and counts no rework. When the blocker closes, `blockedBy` flips to CLOSED and you re-run directly, with the now-merged code on main as your starting point. The refiner is not involved, so put any design notes the next run needs in the blocker comment.
 
@@ -558,7 +558,7 @@ A ticket that ships a "small" out-of-scope production fix inflates ticket size s
 
 If routed back to you (`needs-rework:builder`), **read the verifier's findings comment on the PR first** — it names what failed and why. The findings come from one of the verifier's two modes:
 
-**From triage (a red mechanical gate)** — the comment names the failing checks and partitions them into regressions this PR caused and pre-existing failures it merely unmasked. Fix the regressions. A lint or Spotless red is always yours: `./gradlew spotlessApply`, fix the lint error, re-run `./gradlew lint`. Do **not** try to fix the pre-existing ones: the verifier has already filed or linked a tracking ticket for those, and fixing them here is the § Scope Discipline violation above.
+**From triage (a red mechanical gate)** — the comment names the failing checks and partitions them into regressions this PR caused and pre-existing failures it merely unmasked. Fix regressions in your diff. For lint or Spotless failures, check the verifier's baseline evidence before touching a reported file. If the failure is on unchanged code and reproduces on main, do not format it in this feature PR. Use the verifier's fix ticket or file one if missing, link it as an open blocker, then return `waiting_on_blocker` on Codex. The dispatcher verifies that link and keeps this ticket in development until the fix lands. Rejected actions and missing access still return `blocked`.
 
 **From judgment (review findings)** — read the findings on the PR, fix all MUST FIX items, and address SHOULD FIX items (3+ unfixed = another fail).
 
@@ -575,7 +575,8 @@ The dispatcher does NOT parse your PR body or comments. It reads GitHub labels. 
 - **Success path:** no labels from you. You commit the plan, push the implementation, open the PR; the dispatcher finds no `needs-rework:*`, applies `done:builder`, and advances the ticket to In Code Review.
 - **Oversized (splittable):** YOU add `needs-rework:refiner` with the split-proposal comment (§ A1, § A5). The dispatcher routes the ticket back to Backlog.
 - **Oversized (depth-capped):** YOU add `needs-human:sizing` and keep building (§ A1). The label is a marker for later review, not a stop.
-- **A real dependency on an in-flight ticket (§ A2), UI work with no Figma anchor (§ A3), or ticket too vague to plan (§ A0):** YOU add `needs-rework:refiner`, with the blocker set or a comment naming what's missing.
+- **A real dependency on an in-flight ticket (§ A2):** link it as an open blocker and leave a comment. On Codex, return `waiting_on_blocker`; the dispatcher applies the routing label and keeps this ticket in development without counting rework. On Claude, apply `needs-rework:refiner` as in § A2.
+- **UI work with no Figma anchor (§ A3), or a ticket too vague to plan (§ A0):** return `needs_refinement` on Codex or apply `needs-rework:refiner` on Claude, with a comment naming what's missing.
 
 You never apply a `done:*` label by hand on any path. The dispatcher owns those.
 
