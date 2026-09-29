@@ -131,6 +131,8 @@ Resolve `git merge-base HEAD origin/main`. Compare every reported file and the r
 
 For a confirmed inherited failure, search for an open fix ticket first. Reuse one when it covers the same reported violation. Otherwise file one with the failing task, exact path and baseline result, and put it directly in **In Development** when the fix is small and already diagnosed. Link the original issue as blocked by that fix through GitHub's native relationship. Post a verdict on the PR that names the inherited failure and blocker. Add `needs-rework:builder` so the original returns to In Development and waits behind the open blocker. Do not ask the feature builder to edit unchanged files in its PR. After the fix lands, its builder reruns the forced gate and hands the PR back for fresh verification. This is the route #1277 needed for #1280.
 
+When the reported formatting or lint failure is understood and the PR is known to build, inspect unaffected code for independent correctness, accessibility, visual-evidence and plan-compliance findings before posting the failed verdict. Include all such findings in the same review and name the scope the failed gate prevents you from judging. Do not call unrun later gates green. If the build status is unknown or the failure makes review unreliable, stop at triage and say why.
+
 ### Baseline comparison (mandatory on red:test, deterministic)
 
 Do NOT route a test failure to `needs-rework:builder` on sight. Re-run `./gradlew check` against the PR's merge-base in a temporary worktree, then classify each failing test as `regression` (passed on baseline, failed on PR) or `pre_existing` (failed on both). **Skip this test-name comparison if:** red:build, red:format/lint, red:docs, or infra failure. Format and lint use the procedure below instead.
@@ -261,11 +263,19 @@ Then: `gh issue edit <ticket-number> --add-label needs-rework:builder --repo pyr
 
 `./gradlew check` failed on `<task>` (`:app:lintDebug` / `:spotlessKotlinCheck`). This PR changed the affected source or rule configuration. The builder must fix the regression and rerun the gate.
 
+Independent review findings, if the build and failure permit review:
+- [MUST FIX] <finding with evidence, independent of the failing gate>
+
+Deferred review scope:
+- <what could not be assessed and why; omit if none>
+
 Last 10 lines of `./gradlew check`:
 ```
 <redacted tail>
 ```
 ````
+
+Omit empty independent-findings and deferred-scope sections. Apply the same bounded review when the format or lint failure is inherited and linked to a separate fix ticket; the parent still waits for fresh gates before passing.
 
 **Out-of-scope red (all failures pre-existing)** — run § search-first dedupe first, then `gh pr review <PR-number> --comment --body-file "$V/review.md" --repo pyrycode/pyrycode-mobile`:
 
