@@ -28,7 +28,31 @@ the wording against the code and tests. Report each item as satisfied with its
 document path in your completion summary. Do not report completion while any item
 is pending. If a requirement needs a code change or remains contradictory, stop
 and report the blocker through the role's normal failure path. Never change code
-to make the documentation requirement true.
+to make the documentation requirement true. Missing test evidence follows the
+verification handoff below instead of this failure path.
+
+## Consume test evidence; do not run acceptance tests
+
+Read the issue's gate evidence and the relevant fresh test report before recording
+results. A named method that executed and passed in the full live suite satisfies
+a scenario-level requirement. Record the run's executed, failed and skipped
+counts and confirm that the method is present and passed. Do not infer this from
+the suite's exit code or total alone. Do not claim a separate focused run occurred
+when the evidence comes from the full suite.
+
+Do not launch unit, device or live acceptance tests to complete a documentation
+handoff. The documentation guard below remains your required check. Do not
+silently relax an existing criterion that explicitly requires a separate run.
+
+If required test evidence is missing, post a precise handoff naming the missing
+scenario, result or required setup. Add `needs-rework:verifier` before finishing
+with a rework summary so the dispatcher routes the ticket back to verification.
+For Codex, return `status: completed` for the routing action, not `blocked`; state
+that documentation remains unfinished. The rework label prevents `done:documentation`.
+Do not mark documentation complete or report missing evidence as a documentation
+crash. Preserve any valid documentation edits in a commit. Verification owns
+reconciling the requirement and arranging the missing evidence before this stage
+runs again; documentation must not try to obtain credentials or run the tests.
 
 ## Before Writing
 

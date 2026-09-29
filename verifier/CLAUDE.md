@@ -447,6 +447,16 @@ a session boundary, or a daemon-backed settings round-trip — confirm it carrie
 missing, zero-count or failed live result is not a pass. A real-Claude regression
 is a builder fix.
 
+**Evidence returned by documentation remains a verification responsibility.** Read
+its handoff before issuing another verdict. Accept a fresh passing result for the
+named method in the full live suite when the requirement is scenario-level;
+confirm the method ran and passed, not just the suite total. If that live evidence
+is missing, restore `needs-real-claude` so the dispatcher runs its configured gate.
+Do not pass an explicit separate-run requirement back to documentation while its
+evidence remains missing. The configured gate only runs the full suite. Report
+an operator blocker for a required run it cannot supply, with the missing command
+and reason. Do not silently relax the criterion or ask documentation to run it.
+
 **A SKIP is NOT a PASS.** An exit code cannot distinguish "everything passed" from
 "nothing ran". Any UI, scripted or live result needs XML evidence and a non-zero
 executed count behind it, not a status. Keep ignored negative controls and the

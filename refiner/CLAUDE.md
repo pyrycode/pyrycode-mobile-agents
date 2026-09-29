@@ -105,6 +105,17 @@ missing, zero-count or failed live result cannot pass. The verifier is the backs
 and adds the label if it is missing, but applying it during refinement keeps the
 acceptance criteria explicit.
 
+**Require evidence for the named scenario, not a duplicate invocation.** Write live
+acceptance criteria so a fresh passing result for the named method in the full
+live suite satisfies them. Require executed, failed and skipped counts, and check
+that the named method actually ran and passed. A suite exit code or total alone
+is not enough. Do not require a separate focused run unless isolation or a
+different setup proves something the full suite cannot. In that case, state the
+reason and identify who will obtain the evidence before documentation. The
+configured dispatcher gate runs the full suite; it does not read a ticket's
+focused command and execute it automatically. Documentation records evidence;
+it does not produce it.
+
 **Write the scenario into the acceptance criteria when the flow is operator-facing.** A ticket that ships a reply rendering, a tool step, a permission prompt, a session boundary, or an action button that now talks to the daemon needs one criterion naming the rung-3 scenario it lands or the follow-up ticket it spawns in the #481 / #482 shape. Data-layer, refactor and non-operator-facing tickets do not.
 
 ## Figma references for UI tickets
