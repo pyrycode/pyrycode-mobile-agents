@@ -106,7 +106,7 @@ The injected failure context names the failing gate and carries its output tail.
 |---|---|---|
 | `scripts/docs-guard.sh` failed | **red (docs failure)**, and almost always pre-existing | The builder cannot write `docs/knowledge/features/`, so this is rarely the PR's doing. Confirm at the merge-base before routing anywhere: reproduce, and if the merge-base is red too, treat it as pre-existing and follow § Pre-existing failures. Only a false heading or an oversized file inside the PR's own diff is a regression, and that routes to `needs-rework:builder`. |
 | `./gradlew check` failed and failing unit tests are extractable (`ClassName > testMethod FAILED` lines) | **red (test failure)** | Run the baseline comparison (§ below). Routing depends on the regression vs pre-existing partition. |
-| `./gradlew check` failed with no `FAILED` test lines but the log shows a **lint or Spotless** failure (`> Task :app:lintDebug FAILED`, `Lint found … errors`, `> Task :spotlessKotlinCheck FAILED`, a ktlint diff) | **red (format/lint failure)** | Always a regression: a mechanical builder fix (`./gradlew spotlessApply`, fix the lint error). `needs-rework:builder` immediately — no baseline run, lint and format aren't baseline-comparable. Name the failing task and the tail. |
+| `./gradlew check` failed with no `FAILED` test lines but the log shows a **lint or Spotless** failure (`> Task :app:lintDebug FAILED`, `Lint found … errors`, `> Task :spotlessKotlinCheck FAILED`, a ktlint diff) | **red (format/lint failure)** | Compare the reported files and rule configuration with the merge base. If they are unchanged, run the failing check there with `--rerun-tasks`. Follow the inherited-format procedure below when it reproduces. Otherwise route the regression to `needs-rework:builder`. |
 | `./gradlew assembleDebug` failed | **red (build failure)** | Always a regression (the PR's tree doesn't compile or link resources). `needs-rework:builder` immediately — no baseline run. |
 | `./gradlew compileDebugAndroidTestKotlin` failed | **red (build failure)** | Same routing as a build failure: the instrumented set does not compile. `needs-rework:builder` immediately. Say in the verdict that it was the androidTest compile, so the builder looks under `app/src/androidTest/` and `app/src/sharedTest/`. |
 | Any gate non-zero with no parseable failing names and no recognizable lint / Spotless / compile error (Gradle daemon crash, OOM, `SDK location not found`, `Unable to locate a Java Runtime`, no task output) | **infra failure** | Nothing about the diff was tested. Post the infra template. Do NOT route to rework on this signal alone. Proceed to judgment mode; your verdict alone decides. |
@@ -123,11 +123,17 @@ grep -E ' > .+ FAILED$' "$V/check.log" | sed -E 's/^.* ([A-Za-z0-9_.]+) > (.+) F
 
 This yields `ClassName.testMethod` per failing unit test — the `comm`-comparable name set the baseline run reuses. The durable fallback if the console format drifts is the JUnit XML under `app/build/test-results/**/TEST-*.xml`: each failed `<testcase classname=… name=…>` carries a `<failure>` child.
 
-Only **unit-test** failures are baseline-comparable through the script below. Lint, Spotless, build and androidTest-compile failures have no test name and route straight to `needs-rework:builder` per the table; they never reach the baseline run. A docs failure is compared by hand: run `scripts/docs-guard.sh` in a merge-base worktree and read whether the same paths are reported.
+Only **unit-test** failures use the test-name comparison script below. Format and lint failures use the separate baseline procedure below. Build and androidTest-compile failures still route to `needs-rework:builder` per the table. A docs failure is compared by hand: run `scripts/docs-guard.sh` in a merge-base worktree and read whether the same paths are reported.
+
+### Inherited format or lint failure
+
+Resolve `git merge-base HEAD origin/main`. Compare every reported file and the relevant formatter or lint configuration with that baseline. If any changed in this PR, route the failure to the builder as a regression. If they are unchanged, run the failing task in a temporary baseline worktree with `--rerun-tasks`; a cached green task is not evidence. Use the same SDK and Gradle environment as the PR gate. Remove the temporary worktree when the run finishes. A matching red baseline establishes that this PR inherited the failure. If the baseline cannot run, say so and use the ordinary red route.
+
+For a confirmed inherited failure, search for an open fix ticket first. Reuse one when it covers the same reported violation. Otherwise file one with the failing task, exact path and baseline result, and put it directly in **In Development** when the fix is small and already diagnosed. Link the original issue as blocked by that fix through GitHub's native relationship. Post a verdict on the PR that names the inherited failure and blocker. Add `needs-rework:builder` so the original returns to In Development and waits behind the open blocker. Do not ask the feature builder to edit unchanged files in its PR. After the fix lands, its builder reruns the forced gate and hands the PR back for fresh verification. This is the route #1277 needed for #1280.
 
 ### Baseline comparison (mandatory on red:test, deterministic)
 
-Do NOT route a test failure to `needs-rework:builder` on sight. Re-run `./gradlew check` against the PR's merge-base in a temporary worktree, then classify each failing test as `regression` (passed on baseline, failed on PR) or `pre_existing` (failed on both). **Skip the baseline run entirely if:** red:build, red:format/lint, red:docs, or infra failure.
+Do NOT route a test failure to `needs-rework:builder` on sight. Re-run `./gradlew check` against the PR's merge-base in a temporary worktree, then classify each failing test as `regression` (passed on baseline, failed on PR) or `pre_existing` (failed on both). **Skip this test-name comparison if:** red:build, red:format/lint, red:docs, or infra failure. Format and lint use the procedure below instead.
 
 This is the deterministic safety net for the out-of-scope question. The pre-triage contract — "any red is rework" — meant that PRs which correctly fix one thing while unmasking pre-existing fragility elsewhere burned 3+ rework cycles. The baseline run answers "did THIS PR introduce these failures?" mechanically, with no diff-reasoning or call-graph guessing required. Per the **belt-and-suspenders** principle, the deterministic baseline run is the different-fabric net under the stochastic initial classification.
 
@@ -248,12 +254,12 @@ Last 5 lines of `./gradlew check`:
 
 Then: `gh issue edit <ticket-number> --add-label needs-rework:builder --repo pyrycode/pyrycode-mobile`. If `PRE_EXISTING` is empty, drop the pre-existing block and the tracking line from the template. Omit empty independent-findings and deferred-scope sections.
 
-**Format / lint red** — same command shape with `--request-changes`, then the `needs-rework:builder` label:
+**Format / lint regression** — same command shape with `--request-changes`, then the `needs-rework:builder` label. Use the inherited-failure procedure above when the forced baseline run is also red:
 
 ````
 ❌ **Verification gates failed — lint / format**
 
-`./gradlew check` failed on `<task>` (`:app:lintDebug` / `:spotlessKotlinCheck`). Lint and format failures always route to rework; they are a mechanical builder fix (`./gradlew spotlessApply`, fix the lint error).
+`./gradlew check` failed on `<task>` (`:app:lintDebug` / `:spotlessKotlinCheck`). This PR changed the affected source or rule configuration. The builder must fix the regression and rerun the gate.
 
 Last 10 lines of `./gradlew check`:
 ```
