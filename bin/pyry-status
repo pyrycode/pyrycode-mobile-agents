@@ -27,7 +27,22 @@ if [ ! -f "$LOCK_FILE" ]; then
 fi
 
 LOCKED_PID=$(grep '^PID=' "$LOCK_FILE" | head -1 | cut -d= -f2)
-if [ -z "$LOCKED_PID" ] || ! kill -0 "$LOCKED_PID" 2>/dev/null; then
+case "$LOCKED_PID" in
+  ''|*[!0-9]*)
+    echo "stopped (invalid lock at $LOCK_FILE)"
+    exit 1
+    ;;
+esac
+
+# A sandbox can deny process inspection. `kill -0` reports that denial with
+# the same exit status as a dead PID, so use ps and preserve its error text.
+PROBE=$(ps -p "$LOCKED_PID" -o pid= 2>&1)
+PROBE_STATUS=$?
+if [ "$PROBE_STATUS" -ne 0 ] && [ -n "$PROBE" ]; then
+  echo "unknown (process inspection failed for PID $LOCKED_PID: $PROBE)"
+  exit 2
+fi
+if [ "$PROBE_STATUS" -ne 0 ] || [ -z "$PROBE" ]; then
   echo "stopped (stale lock at $LOCK_FILE)"
   exit 1
 fi
