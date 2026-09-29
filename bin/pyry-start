@@ -88,6 +88,18 @@ if [ -f "$LOCK_FILE" ]; then
   rm -f "$LOCK_FILE"
 fi
 
+# Check the live main checkout before dispatch starts. A red baseline is reported
+# here, while the builder's forced check prevents a feature handoff from hiding
+# the same failure behind Gradle's cached task result. Keep dispatch available so
+# the baseline fix ticket itself can run.
+if [ -x "$RESOLVED_TARGET/gradlew" ] &&
+   { [ -n "$ANDROID_HOME" ] || [ -f "$RESOLVED_TARGET/local.properties" ]; } &&
+   [ "$(git -C "$RESOLVED_TARGET" branch --show-current 2>/dev/null)" = main ]; then
+  if ! (cd "$RESOLVED_TARGET" && ./gradlew spotlessCheck --rerun-tasks --console=plain); then
+    echo "warning: local main failed the forced Spotless check; inspect the baseline before unrelated feature reviews" >&2
+  fi
+fi
+
 # Keep the submodule's node_modules in sync. Cheap no-op when up to date
 # (~50ms); guarantees a clean restart after a submodule SHA bump.
 cd "$AGENTS_DIR/dispatcher"

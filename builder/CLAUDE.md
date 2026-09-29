@@ -392,7 +392,7 @@ Then implement: follow your plan's interfaces and data flows; make the tests pas
 - **Errors:** at I/O boundaries return `Result<T>` or a sealed `Outcome` type, never let exceptions leak into UI state. Inside the domain, throw `IllegalStateException` / `IllegalArgumentException` for invariant violations. Wrap network errors into a domain error type before they cross into a ViewModel.
 - **Coroutines:** `viewModelScope.launch` for ViewModel work; cold flows (`flow { }`, `repository.observeX()`) collected via `collectAsStateWithLifecycle` in composables. **No `GlobalScope`.** No `runBlocking` outside tests. Inject dispatchers via constructor so tests can substitute. Every job has a defined cancellation path.
 - **Compose:** stateless composables when possible; state hoisted to the caller (ultimately the ViewModel); screen composables receive `(state: UiState, onEvent: (Event) -> Unit)`; `LaunchedEffect(key)` for side effects bound to composition, `DisposableEffect` for cleanup; `remember` / `rememberSaveable` only for genuinely UI-local state; Material 3 theme tokens (`MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*`, `MaterialTheme.shapes.*`) for every colour, type style and shape — never hardcoded values or a bare `TextStyle()`; `contentDescription` on every interactive non-text element.
-- **Format** with the project's Spotless / ktlint config: `./gradlew spotlessApply` before you commit. `./gradlew check` runs `spotlessCheck` in the verifier's gate, and a format-only red is a rework cycle you did not need.
+- **Format** with the project's Spotless / ktlint config: `./gradlew spotlessApply` before you commit, then run `./gradlew spotlessCheck --rerun-tasks --console=plain` before handoff. The forced check avoids a cached green result hiding a formatting failure. If it fails only on files unchanged from the merge base, verify the same failure on main, link or file a baseline fix ticket, and return `waiting_on_blocker` instead of editing unrelated files in this PR.
 - **Logging (required for every feature):** emit **content-free structured logs** for a feature's key lifecycle events and every classified error — event name, static codes, byte lengths, host + path, status, payload hash + length. **Never log a secret or a value**: no tokens, keys, pairing payloads, message plaintext, or decrypted bytes. Log the shape, never the content. Verbose logging is debug-only; nothing chatty reaches Logcat in a release build.
 - **Daemon text may be rendered as text, length-bounded**, never into a WebView, an attribute, a URL, a filename, a cache key or a log. A new inbound verb that carries daemon-authored text into Compose is why #623 carries the security label.
 
@@ -601,6 +601,7 @@ If you write "this needs a split" in a comment but don't add the label, **the ti
 ./gradlew assembleDebug                   # Build debug APK — your gate, also the salvage gate
 ./gradlew compileDebugAndroidTestKotlin   # androidTest compiles — yours when you touch that set
 ./gradlew spotlessApply                   # Format before committing
+./gradlew spotlessCheck --rerun-tasks --console=plain # Forced format gate before handoff
 ./gradlew installDebug                    # Optional local install
 # Focused managed-device tests and single scripted scenarios: see section B2.
 ```

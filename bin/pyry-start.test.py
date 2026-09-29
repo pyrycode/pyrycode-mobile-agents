@@ -8,12 +8,18 @@ import tempfile
 import unittest
 
 class RunnerOptionTests(unittest.TestCase):
-    def launch(self, args, saved="claude", entry="pyry-start", auth_fails=False, missing_helper=False, stale_lock=False):
+    def launch(self, args, saved="claude", entry="pyry-start", auth_fails=False, missing_helper=False, stale_lock=False, main_format_status=None):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "bin").mkdir()
             (root / "dispatcher").mkdir()
             (root / "target").mkdir()
+            if main_format_status is not None:
+                subprocess.run(["git", "init", "-q", "-b", "main", str(root / "target")], check=True)
+                (root / "target/local.properties").write_text("sdk.dir=/test/sdk\n")
+                gradlew = root / "target/gradlew"
+                gradlew.write_text('#!/bin/sh\nprintf "format check: %s\\n" "$*"\nexit "$TEST_FORMAT_STATUS"\n')
+                gradlew.chmod(0o755)
             fake = root / "fake"
             fake.mkdir()
             shutil.copy2(Path(__file__).with_name("pyry-start"), root / "bin/pyry-start")
@@ -58,7 +64,8 @@ Path(os.environ['TEST_ROOT'],'result').write_text(json.dumps({'runner':os.enviro
                        TEST_ROOT=str(root), TEST_SAVED_RUNNER=saved,
                        TARGET_REPO_PATH=str(root / "target"), PYRY_AGENT_RUNNER="parent-value",
                        PYRY_AUTOMATION_ACCESS=str(fake / ("missing" if missing_helper else "automation-access")),
-                       TEST_AUTH_FAILS="yes" if auth_fails else "no")
+                       TEST_AUTH_FAILS="yes" if auth_fails else "no",
+                       TEST_FORMAT_STATUS=str(main_format_status or 0))
             run = subprocess.run(["sh", str(root / "bin" / entry), *args], env=env,
                                  capture_output=True, text=True, timeout=10)
             result = json.loads((root / "result").read_text()) if (root / "result").exists() else None
@@ -70,6 +77,15 @@ Path(os.environ['TEST_ROOT'],'result').write_text(json.dumps({'runner':os.enviro
         self.assertEqual(result["runner"], "codex")
         self.assertFalse(result["service_token_present"])
         self.assertEqual(result["args"], ["--import", "tsx", "src/dispatch-bin.ts"])
+
+    def test_main_format_preflight_runs_without_blocking_a_baseline_fix(self):
+        for status in [0, 1]:
+            with self.subTest(format_status=status):
+                run, result, _ = self.launch([], main_format_status=status)
+                self.assertEqual(run.returncode, 0, run.stderr)
+                self.assertIsNotNone(result)
+                self.assertIn("format check: spotlessCheck --rerun-tasks --console=plain", run.stdout)
+                self.assertEqual("local main failed the forced Spotless check" in run.stderr, status == 1)
 
     def test_claude_overrides_saved_codex(self):
         run, result, _ = self.launch(["--runner=claude"], saved="codex")
