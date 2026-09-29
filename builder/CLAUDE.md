@@ -417,16 +417,20 @@ If you reach Phase B on a labelled ticket and the committed plan has no `## Secu
 
 ### B2. Verify — touched scope only
 
-Run the checks for the code and tests you changed:
+Run focused checks for the behavior you changed, including existing tests that cover it even when their files are untouched:
 
 ```bash
-./gradlew testDebugUnitTest --tests "<classes-you-touched>"   # Your change green (RED→GREEN)
+./gradlew testDebugUnitTest --tests "<affected-test-classes>"   # Your change green (RED→GREEN)
 ./gradlew lint                                   # Android Lint clean (no errors; warnings reviewed)
 ./gradlew assembleDebug                          # Debug build succeeds — also the salvage gate
 ./gradlew compileDebugAndroidTestKotlin          # Only when you touched app/src/androidTest/ or app/src/sharedTest/
 ```
 
-The aggregate `test` task does not accept `--tests` in this project. Scope `testDebugUnitTest` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
+The aggregate `test` task does not accept `--tests` in this project. Scope `testDebugUnitTest` to the affected classes, including existing regression coverage. **Do NOT run the whole-project `./gradlew test` or `./gradlew check` as a capstone.** The whole-suite regression is the verifier's gate: the dispatcher runs `scripts/docs-guard.sh`, `./gradlew check`, `./gradlew assembleDebug` and `./gradlew compileDebugAndroidTestKotlin` deterministically after your PR opens, and a red routes back to you with the failure context already triaged. Running it yourself duplicates that gate and can exceed your wall-clock budget (the pyrycode #1066 shape — the run finished the work, then the final full sweep blew the wall). `./gradlew assembleDebug` stays in your gate because it is also the salvage gate and it is the only thing that compiles the side you did not write tests for.
+
+**For visual changes, check existing layout and interaction coverage before handoff.** Search both `app/src/sharedTest` and `app/src/androidTest` for the affected screen and its shared header, footer, fields, system insets and keyboard behavior. Run the relevant existing methods as well as new tests. Use the focused device command below for affected device-only coverage even when you did not edit that test file.
+
+When a reference intentionally changes geometry, reconcile old assertions with the current acceptance criteria and cite the reference in the PR. Do not delete or loosen a failing assertion just to get green. Measure visible geometry separately from invisible touch areas. If controls or fields move or resize, use real pointer taps at the field surface and neighboring control boundaries to prove focus and action routing; a screenshot or semantic click alone cannot prove the hit area. Record which existing tests ran and any justified expectation changes in the PR. The dispatcher still owns the full suite.
 
 **Run focused device tests while building and repairing a device-only test.** A
 shared screen test needs no device: `testDebugUnitTest --tests` above is its focused

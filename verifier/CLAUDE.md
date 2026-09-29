@@ -37,7 +37,7 @@ Every dispatcher, agent and interactive session shares one GitHub account and it
 The first lines of your run prompt carry a note from the dispatcher:
 
 - A note headed **`## Deterministic gates`**, reporting every gate passed → **judgment mode.** The PR's tree is green. Review the diff for judgment-heavy concerns — Compose recomposition correctness, Kotlin idiom, coroutine lifecycle, the data-layer boundary, accessibility, visual fidelity, blast-radius, plan compliance, the real-claude scenario — and make a PASS/FAIL decision. Do not re-run the gates.
-- A note headed **`## Deterministic gates — TRIAGE MODE`** (a gate ran red; the failure context is injected below the heading) → **triage first.** Partition the failures deterministically into regressions this PR caused and pre-existing failures it merely unmasked, route accordingly, and — when every failure is pre-existing — proceed into judgment mode in the same run, because the PR itself is still reviewable.
+- A note headed **`## Deterministic gates — TRIAGE MODE`** (a gate ran red; the failure context is injected below the heading) → **triage first.** Partition the failures deterministically into regressions this PR caused and pre-existing failures it merely unmasked, route accordingly, and use the routing rules below. With an understood test regression and a successful build, batch independent review findings into the same FAIL verdict. When every failure is pre-existing, proceed into judgment mode as before.
 
 If neither note is present, the deterministic gate layer did not run — an explicitly
 emptied configuration or a dispatcher fault. Do not review blind. Name the missing
@@ -177,7 +177,7 @@ fi
 
 **Routing after the comparison** — three cases:
 
-1. **`REGRESSIONS` non-empty** → at least one failing test passed on the baseline but fails on this PR. Post the standard-red template, add `needs-rework:builder`, and **stop — do not proceed to judgment mode.** The diff you would review is about to change. If `PRE_EXISTING` is also non-empty, mention those too, flagged as "pre-existing, tracked separately," and run § search-first dedupe before posting so the linkage is in the review body.
+1. **`REGRESSIONS` non-empty** → at least one failing test passed on the baseline but fails on this PR. Keep the verdict **FAIL** and add `needs-rework:builder`. If the failure is understood and there is evidence that the PR builds, inspect unaffected parts of the diff for independent correctness, accessibility, visual-evidence and plan-compliance findings in the same run. Combine them with the test failures in one standard-red review. Skip conclusions that depend on the broken behavior, name the deferred scope, and stop if the failure or build status makes further review unreliable. Do not rerun the full gates to unlock this review. A limited review never turns failed gates into PASS; the repaired PR still needs fresh gates and review. If `PRE_EXISTING` is also non-empty, mention those too, flagged as "pre-existing, tracked separately," and run § search-first dedupe before posting so the linkage is in the review body.
 
 2. **`REGRESSIONS` empty AND `PRE_EXISTING` non-empty** → ALL failing tests fail on baseline too. The PR did not introduce them. Track the `PRE_EXISTING` set (§ search-first dedupe), post the out-of-scope-red template, add **no labels from the triage half**, then **proceed into judgment mode in this same run** — the PR itself is reviewable, and your judgment verdict owns the labels from here.
 
@@ -220,7 +220,7 @@ All three use the parenthetical-with-attribution style so the linkage is unambig
 
 ### Triage templates
 
-**Standard red (regressions present)** — `gh pr review <PR-number> --request-changes --body-file "$V/review.md" --repo pyrycode/pyrycode-mobile`:
+**Standard red (regressions present, plus any independent findings from the bounded review above)** — `gh pr review <PR-number> --request-changes --body-file "$V/review.md" --repo pyrycode/pyrycode-mobile`:
 
 ````
 ❌ **Verification gates failed — regressions introduced by this PR**
@@ -234,13 +234,19 @@ Pre-existing failures (fail on both baseline AND PR branch, NOT caused by this P
 
 `<TRACKING-LINE>`
 
+Independent review findings, if the build and failure permit review:
+- [MUST FIX] <finding with evidence, independent of the failing tests>
+
+Deferred review scope:
+- <what could not be assessed and why; omit if none>
+
 Last 5 lines of `./gradlew check`:
 ```
 <redacted tail>
 ```
 ````
 
-Then: `gh issue edit <ticket-number> --add-label needs-rework:builder --repo pyrycode/pyrycode-mobile`. If `PRE_EXISTING` is empty, drop the pre-existing block and the tracking line from the template.
+Then: `gh issue edit <ticket-number> --add-label needs-rework:builder --repo pyrycode/pyrycode-mobile`. If `PRE_EXISTING` is empty, drop the pre-existing block and the tracking line from the template. Omit empty independent-findings and deferred-scope sections.
 
 **Format / lint red** — same command shape with `--request-changes`, then the `needs-rework:builder` label:
 
