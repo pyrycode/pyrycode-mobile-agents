@@ -409,6 +409,8 @@ gh api graphql -f query='mutation($projectId: ID!, $itemId: ID!) {
 4. **Use codegraph for blast-radius checks** (below). Reading the diff alone shows what changed; codegraph shows what consumes the changed symbols and may break.
 5. Optional, when the area is unfamiliar and the steps above left a gap: `mcp__qmd__query(collections: ["pyrycode-mobile-docs"], searches: [{type: "lex", query: "<topic of the PR>"}], intent: "Find current Mobile development guidance")`; the `pyrycode-mobile-docs` collection may not exist yet — fall back to `pyrycode-docs` for cross-project lessons. `docs/lessons.md` is frozen (2026-05-11) historical reference; read it only when chasing something specific and old.
 
+**Finish the review before posting a verdict.** Record findings while reading, but keep checking every changed file and every applicable review criterion after the first MUST FIX. When a finding reveals a repeated pattern, search the full PR diff for its siblings and report every instance in the same verdict. On a rework pass, check the previous findings and review the full current diff again, not only the builder's latest repair. Ticket #1300 took two avoidable rework laps because the first review passed with two fixed corner shapes in one file; the next two reviews reported those shapes one at a time.
+
 ### Codegraph (use it before grep)
 
 Pyrycode-mobile is indexed for codegraph; the `mcp__codegraph__codegraph_*` MCP tools are wired into your tool surface, and the dispatcher symlinks the canonical `.codegraph/` index into your worktree. **Default to codegraph for symbol-level questions; fall back to grep only when codegraph returns no useful results.** Each tool call is a turn — don't pay for both, and your budget is shared with any sub-agents you spawn.
@@ -436,13 +438,18 @@ If the plan has a `## Design source` section with a Figma URL (not `N/A`), you M
    ```
 3. **Fetch the diff's rendered output.** Read any `@Preview` composables the builder added (the cheapest visual reference) and the `app/src/main/java/de/pyryco/mobile/ui/...` files touched by the PR to mentally render what the user sees.
 4. **Compare against the screenshot.** Look for:
-   - **Token fidelity** — does the code use `MaterialTheme.colorScheme.*` and `MaterialTheme.typography.*`, or are there hardcoded hex values / `TextStyle()` defaults / fixed `RoundedCornerShape(8.dp)` outside the theme? Hardcoded values are MUST FIX even if they happen to match the Figma.
+   - **Token fidelity** — does the code use `MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*` and `MaterialTheme.shapes.*`, or are there hardcoded hex values / `TextStyle()` defaults / fixed `RoundedCornerShape(...)` values outside the theme? Run the candidate scan below against the whole PR, then check every match against the theme and the design. It catches both #1300 corner literals in one pass. It does not replace reading the full diff. Hardcoded values are MUST FIX where a theme token exists, even if they happen to match the Figma.
    - **Layout shape** — column / row / box hierarchy, alignment, nesting. Spacing values should derive from Figma's auto-layout.
    - **Component choice** — M3 components used where applicable (`Button` not raw `Box { Text }`, `LazyColumn` not eager `Column { items.forEach }`).
    - **Decorations** — gradients, glows, atmospheric overlays from the Figma. Missing decorations are SHOULD FIX unless the builder documented the deviation.
    - **Assets** — icons / logos from Figma rendered correctly (downloaded from `get_design_context`'s source, not substituted with package icons).
 
 **Severity:** hardcoded color / typography / shape values where M3 tokens exist = MUST FIX; wrong M3 component = MUST FIX; missing decoration = SHOULD FIX unless documented; spacing off by ≤ 4dp = NIT.
+
+```bash
+git diff --unified=0 "$(git merge-base HEAD origin/main)" HEAD -- ':(glob)app/src/main/**/*.kt' |
+  rg '^\+[^+].*(Color\(0x|TextStyle\(|RoundedCornerShape\()' || true
+```
 
 If the diff doesn't touch UI but the plan has a Design source section (e.g. a data-layer ticket whose body carried a Figma URL by mistake), note it once and pass on visual fidelity. If the plan says `N/A — <justification>`, skip this section entirely.
 
@@ -485,7 +492,7 @@ transient real-Claude spinner manual.
 - **Recomposition correctness** — composables that take unstable types (lambdas captured from caller, mutable types) recompose unnecessarily. Look for lambdas that should be `remember { ... }` to keep referential equality; lists that should be `key()`-keyed for stable identity (the thread keys rows by the wire message id); state derivations that should use `derivedStateOf`; `MutableState` reads inside `LaunchedEffect` (a stale-state trap).
 - **State hoisting** — composables that own state they shouldn't. Top-level screen composables should receive `(state, onEvent)`; only UI-local state (input fields, expand/collapse toggles) belongs in `remember` / `rememberSaveable`.
 - **Lifecycle** — `LaunchedEffect(key)` keys include every captured value that should restart the effect; `DisposableEffect` for any subscription / listener that needs cleanup; `rememberSaveable` for state that should survive configuration changes; no side effects launched in composition without an effect-handler scope.
-- **Material 3 token usage** — every color, typography, shape from `MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*`, `MaterialTheme.shapes.*`. Hardcoded colors (`Color(0xFF...)`), `TextStyle()` defaults, or fixed `RoundedCornerShape(8.dp)` outside the theme are MUST FIX.
+- **Material 3 token usage** — every color, typography, shape from `MaterialTheme.colorScheme.*`, `MaterialTheme.typography.*`, `MaterialTheme.shapes.*`. Hardcoded colors (`Color(0xFF...)`), `TextStyle()` defaults, or fixed `RoundedCornerShape(...)` outside the theme are MUST FIX where a theme token exists.
 - **Dynamic color** — the `Theme` composable falls through to `dynamicLightColorScheme(context)` / `dynamicDarkColorScheme(context)` on supported versions, with the static fallback applying only below.
 - **Accessibility** — every interactive element with no visible text needs `contentDescription`; tap targets ≥ 48dp (`Modifier.minimumInteractiveComponentSize()` if necessary); `Modifier.semantics` for non-obvious roles; contrast at WCAG AA.
 - **Preview annotations** — every screen-level composable should have at least one `@Preview` (light + dark where the palette differs). Missing previews are SHOULD FIX.
