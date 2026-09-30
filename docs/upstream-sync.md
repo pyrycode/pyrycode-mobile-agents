@@ -81,3 +81,13 @@ tickets, so the new ceiling is an extrapolation. Judge it on the first ten build
 runs on tickets estimated above 800 lines. A builder run past two thirds of its
 budget, or a documentation timeout, is the warning. A run that exhausts its
 continuation leg too is the evidence for tightening.
+
+## Claude review overlap, 2026-09-30
+
+The shared runtime now supports source review alongside checks for Claude too.
+Its preliminary phase has only file-reading tools. The final phase retains the
+full verifier contract and waits for both source review and check results.
+Claude shares its turn limit across both phases. The existing time limit also
+covers both. Mobile retains two ticket slots and one verifier at a time.
+Install without stopping or restarting the dispatcher. The new runtime loads
+on its next launch.

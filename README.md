@@ -101,3 +101,8 @@ Same as pyrycode/agents — private, no public license. Internal use within the 
 ## Shared workflow
 
 Claude and Codex use the same repository knowledge and role instructions. Read [shared development practice](docs/working-practice.md) and [the September workflow sync](docs/upstream-sync.md). The dispatcher runs the managed-device UI and scripted gates before verifier, then runs the live real-Claude gate after verifier for `needs-real-claude` tickets.
+
+Review overlap supports Claude and Codex. Claude preliminary review has only
+file-reading tools and receives the full diff from the dispatcher. Both phases
+share the existing time and turn budgets. Keep the current dispatcher running
+during this rollout. The new runtime loads on its next launch.
