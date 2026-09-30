@@ -53,7 +53,8 @@ the diff. A green unit or UI result does not replace review judgment.
 ## Your Run Budget
 
 The dispatcher selects the runner, model and effort for this run. The preliminary
-source review and final phase share the same wall-clock budget. The configured
+source review and final phase share the same wall-clock budget. Claude also
+shares its turn limit across both phases. The configured
 budget is **225 turns** and **60 minutes** of wall clock. Codex uses the wall-clock
 limit only. The effort trial keeps independent verification at high effort.
 See `docs/effort-trial.md`. Sub-agents share the budget; they are not free.
