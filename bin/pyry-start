@@ -127,6 +127,12 @@ export PYRY_AUTOCURATE_MEMORY=0
 # This overrides only its wall clock; the shared budget scale still sets turns.
 export PYRY_BUILDER_TIMEOUT_MINUTES="${PYRY_BUILDER_TIMEOUT_MINUTES:-70}"
 
+# Two tickets can progress together. Keep verifier device gates serial;
+# Codex source review overlaps that verifier's own deterministic gates.
+export PYRY_MAX_CONCURRENT="${PYRY_MAX_CONCURRENT:-2}"
+export PYRY_VERIFIER_SERIAL="${PYRY_VERIFIER_SERIAL:-1}"
+export PYRY_VERIFIER_PARALLEL_REVIEW="${PYRY_VERIFIER_PARALLEL_REVIEW:-1}"
+
 # The node binary by absolute path, so `ps` (and pyry-status) show which
 # node the dispatcher runs on. Catches the Homebrew-vs-nvm class of bug
 # from 2026-05-03.

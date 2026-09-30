@@ -1,5 +1,19 @@
 # Mobile workflow sync
 
+## Verifier throughput, 2026-09-30
+
+The launcher defaults to two concurrent agents and one verifier at a time.
+Codex verifiers use `PYRY_VERIFIER_PARALLEL_REVIEW=1`: preliminary source review
+runs alongside deterministic gates with read-only local access. Both must finish
+before the final phase receives the report and gate evidence and can publish.
+Figma and live-evidence checks and red-gate triage remain in that final phase.
+Both phases share the original verifier wall-clock budget. A failed preliminary
+review cannot be salvaged as a pass because a PR already exists.
+
+Explicit exported settings override these launcher defaults. The classic pipeline
+and Claude runner retain the sequential gate-then-review path. Documentation and
+verifier serial limits remain active when two tickets are running.
+
 Updated 2026-09-20 from the current Pyrycode and Desktop workflow.
 
 - Shared product knowledge and role practice replace private Claude memory.
