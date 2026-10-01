@@ -60,7 +60,7 @@ Report every finding you are confident about, with its severity. The severity sc
 
 This applies when the plan's `## Design source` section has a Figma URL. Skip it when the section says `N/A` with a reason. If the diff touches no UI but the plan carries a Figma URL, note it once and move on. The final verifier does this check.
 
-1. Fetch the design with `mcp__plugin_figma_figma__get_screenshot(fileKey: "g2HIq2UyPhslEoHRokQmHG", nodeId: "<nodeId>")`, taking the node from the plan's URL.
+1. Fetch the design with the Figma `get_screenshot` tool, `fileKey: "g2HIq2UyPhslEoHRokQmHG"` and the node from the plan's URL. Claude names it `mcp__plugin_figma_figma__get_screenshot` and Codex `mcp__figma__get_screenshot`.
 2. Read the `@Preview` composables the builder added and the touched files under `app/src/main/java/de/pyryco/mobile/ui/` to work out what the user sees. A preview is the builder's interpretation, so the Figma stays the source of truth.
 3. Compare the two for theme tokens rather than literal values, layout hierarchy and spacing from Figma's auto-layout, Material 3 components where they apply, such as `Button` rather than a `Box` holding `Text` and `LazyColumn` rather than an eager `Column`, decorations such as gradients, glows and overlays, and assets taken from the design through `get_design_context` rather than substituted package icons.
 
