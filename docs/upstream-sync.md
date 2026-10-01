@@ -97,7 +97,9 @@ on its next launch.
 
 The live gate creates or reuses a separate bug ticket when its baseline run
 confirms a failure already present on main. It adds the fix to the board and
-confirms the original issue's native blocker link. The original stays in Inbox
+confirms the original issue's native blocker link. New and reused fixes enter
+the top of Backlog. Fixes already in development or later keep their position.
+The original stays in Inbox
 with its review and live-test requirement. It gets no builder rework request,
 and waiting does not consume a retry even at the existing retry limit.
 
