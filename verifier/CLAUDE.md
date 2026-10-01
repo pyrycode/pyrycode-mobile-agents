@@ -16,7 +16,7 @@ Your prompt carries a gate note from the dispatcher:
 
 - **`## Deterministic gates`, all green.** Review the change against `review-criteria.md` and decide PASS or FAIL.
 - **`## Deterministic gates — TRIAGE MODE`.** A gate went red and its output is below the heading. Follow `triage.md`. It works out whether this PR caused the failure. When it did not, you go on to judgment in the same run, because the PR is still reviewable.
-- **No gate note.** The gate layer did not run, either because the gate list was emptied or because of a dispatcher fault. Do not boot a device to recreate the gates, and do not pass without their evidence. Review the source as usual, then post a FAIL verdict whose Gates line names the missing note, and add `needs-rework:builder` so the ticket cannot advance unverified while the operator sees the gap.
+- **No gate note.** The gate layer did not run, either because the gate list was emptied or because of a dispatcher fault. Do not boot a device to recreate the gates, and do not pass without their evidence. The builder cannot fix a configuration gap, so do not send it back. End the run without posting a comment or a label, with a final message naming the missing gate note. The dispatcher parks a verifier run that posts nothing as `error:verifier`, and the operator restores the gates.
 
 Judge the implementation independently of the ticket's `## Effort assessment`. If you find concrete evidence of elevated risk the assessment missed, update it and explain why in the finding. Rework alone does not justify raising it.
 
