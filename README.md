@@ -31,8 +31,13 @@ pyrycode-mobile-agents/
 ├── code-review/CLAUDE.md     # Classic set — Code Review agent: Compose / Material 3 / a11y review
 ├── documentation/CLAUDE.md   # Both sets — Documentation agent: feature overviews, ADRs, the e2e ladder doc
 ├── refiner/CLAUDE.md         # Builder set — the PO contract under its new name
+├── refiner/splitting.md      # Builder set: the split procedure and the split-depth gate, read before any split
+├── refiner/sizing-history.md # Builder set: the measurements behind the sizing numbers
 ├── builder/CLAUDE.md         # Builder set — plan, then implement, in one warm session
 ├── builder/security-review.md # Builder set — the adversarial checklist on security-sensitive plans
+├── builder/handoffs.md       # Builder set: splits, blocker waits, out-of-scope bugs, inherited format failures
+├── builder/ui-work.md        # Builder set: Figma reading, Compose translation and visual checks on UI tickets
+├── builder/device-tests.md   # Builder set: focused emulator runs, scripted scenarios and the real-Claude harness
 ├── verifier/CLAUDE.md        # Builder set — triage of red Gradle gates, then judgment review
 ├── bin/                      # pyry-start, pyry-drain, pyry-status, pyry-test, ...
 ├── .env.example              # Copy to .env (gitignored)
