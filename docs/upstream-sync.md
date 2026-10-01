@@ -91,3 +91,23 @@ Claude shares its turn limit across both phases. The existing time limit also
 covers both. Mobile retains two ticket slots and one verifier at a time.
 Install without stopping or restarting the dispatcher. The new runtime loads
 on its next launch.
+
+
+## Shared live failures wait on separate fixes, 2026-10-01
+
+The live gate creates or reuses a separate bug ticket when its baseline run
+confirms a failure already present on main. It adds the fix to the board and
+confirms the original issue's native blocker link. The original stays in Inbox
+with its review and live-test requirement. It gets no builder rework request,
+and waiting does not consume a retry even at the existing retry limit.
+
+After every blocker closes, the dispatcher tests again against current main.
+Only a passing live result advances the original to documentation. A failure
+introduced by the branch still returns to its builder. A fix ticket also remains
+responsible for repairing its own named failing test. Mixed failures track shared
+fixes separately while returning the branch regressions to its builder.
+
+Ticket reuse follows the existing tracking conventions. A partial GitHub write
+reuses the issue on recovery. An unconfirmed blocker leaves the original parked
+with a gate error for operator recovery. Both foreground and background live runs
+use the new route. This closes the workflow gap exposed by Mobile ticket #1397.
