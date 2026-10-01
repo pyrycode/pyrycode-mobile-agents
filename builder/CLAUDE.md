@@ -455,6 +455,12 @@ binaries from the configured sibling sources and makes no real Claude calls.
 Read the shared practice for setup and approval requirements. These focused runs
 are part of development and rework, including when the dispatcher found the failure.
 
+Run each focused device command in the foreground and wait for it to exit. Set a
+long enough timeout on that shell call. Do not reach for the Monitor tool to watch a
+run: the dispatcher denies it, and the denial halts the whole run with
+`error:builder:permission_denied`, as it did on #1311 on 2026-10-01. If a run must go
+to the background, check its output file with ordinary shell reads.
+
 After each repair, rerun the failing method or scenario before handing back the PR.
 Then run the affected class when the repair changes shared test setup. Inspect fresh
 XML under `app/build/outputs/androidTest-results/managedDevice/debug/pixel2Api33Atd/`.
