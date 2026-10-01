@@ -45,7 +45,7 @@ Report every finding you are confident about, with its severity. The severity sc
 - **Repository pattern.** Composables and ViewModels never call the network or DataStore directly, only through the repository interface.
 - **Feature boundaries.** A feature directory under `ui/` does not import from a sibling feature. Shared code lives in `ui/conversations/components/`, `data/` or `di/`.
 - **Multiplatform readiness.** `data/` never imports `android.*`. Anything `Context`-shaped in the data layer is a MUST FIX.
-- **Wire types match the protocol.** Payload types under `data/network/` mirror `docs/protocol-mobile.md` field for field, unless the PR references a matching daemon change. The Noise variant stays `Noise_IK_25519_ChaChaPoly_BLAKE2s` through the vendored `noise-java`; a hand-rolled handshake step is a MUST FIX.
+- **Wire types match the protocol.** Payload types under `data/network/` mirror the daemon repository's `docs/protocol-mobile.md` field for field. It is not in this repository; read it from the sibling checkout at `../pyrycode/docs/protocol-mobile.md` when one exists, unless the PR references a matching daemon change. The Noise variant stays `Noise_IK_25519_ChaChaPoly_BLAKE2s` through the vendored `noise-java`; a hand-rolled handshake step is a MUST FIX.
 
 ### General
 
