@@ -36,7 +36,7 @@ python3 scripts/android-test-gate.py scripted <scenario>
 
 It builds isolated test binaries from the configured `PYRYCODE_SRC` and `PYRYCODE_RELAY_SRC` sibling sources, keeps the harness's own test daemon identity and makes no real Claude calls.
 
-Run each in the foreground with a shell timeout long enough for the emulator, and wait for it to exit. Do not use the Monitor tool; the dispatcher denies it and the denial ends the run.
+Run each in the foreground with a shell timeout long enough for the emulator, and wait for it to exit. The dispatcher's live gate can hold the emulator for up to about ten minutes while you work. If the script reports the device busy, that is not a test result: continue with other work and run it again later. Do not use the Monitor tool; the dispatcher denies it and the denial ends the run.
 
 ## Evidence
 
