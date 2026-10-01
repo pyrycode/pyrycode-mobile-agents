@@ -38,7 +38,9 @@ pyrycode-mobile-agents/
 ├── builder/handoffs.md       # Builder set: splits, blocker waits, out-of-scope bugs, inherited format failures
 ├── builder/ui-work.md        # Builder set: Figma reading, Compose translation and visual checks on UI tickets
 ├── builder/device-tests.md   # Builder set: focused emulator runs, scripted scenarios and the real-Claude harness
-├── verifier/CLAUDE.md        # Builder set — triage of red Gradle gates, then judgment review
+├── verifier/CLAUDE.md        # Builder set: verifier run flow, label contract and verdict format
+├── verifier/review-criteria.md # Builder set: review criteria shared with the preliminary source reviewer
+├── verifier/triage.md        # Builder set: red-gate triage, read only when a gate fails
 ├── bin/                      # pyry-start, pyry-drain, pyry-status, pyry-test, ...
 ├── .env.example              # Copy to .env (gitignored)
 └── dispatcher/               # submodule → pyrycode/agent-dispatcher
