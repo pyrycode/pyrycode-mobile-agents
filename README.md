@@ -33,7 +33,9 @@ pyrycode-mobile-agents/
 ├── refiner/CLAUDE.md         # Builder set — the PO contract under its new name
 ├── builder/CLAUDE.md         # Builder set — plan, then implement, in one warm session
 ├── builder/security-review.md # Builder set — the adversarial checklist on security-sensitive plans
-├── verifier/CLAUDE.md        # Builder set — triage of red Gradle gates, then judgment review
+├── verifier/CLAUDE.md        # Builder set: verifier run flow, label contract and verdict format
+├── verifier/review-criteria.md # Builder set: review criteria shared with the preliminary source reviewer
+├── verifier/triage.md        # Builder set: red-gate triage, read only when a gate fails
 ├── bin/                      # pyry-start, pyry-drain, pyry-status, pyry-test, ...
 ├── .env.example              # Copy to .env (gitignored)
 └── dispatcher/               # submodule → pyrycode/agent-dispatcher
