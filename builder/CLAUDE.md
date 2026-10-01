@@ -59,7 +59,7 @@ Documentation requirements belong to the documentation stage, which runs after t
 
 ## Labels and outcomes
 
-The dispatcher reads GitHub labels and, under Codex, your structured outcome. It never reads your comments or PR body for routing. A comment that says "this needs a split" without the label or outcome lets the ticket advance anyway.
+The dispatcher reads GitHub labels and, under Codex, your structured outcome. It never reads your comments or PR body for routing. The one PR body section it reads is `## Live tests`, which chooses what the live gate runs, not where the ticket goes. A comment that says "this needs a split" without the label or outcome lets the ticket advance anyway.
 
 | Situation | On Claude | On Codex |
 |---|---|---|
@@ -259,6 +259,9 @@ Closes #<ticket>
 
 ## Testing
 The focused commands that ran and their results. Device or scripted evidence where device-tests.md asks for it. For visual changes, the existing tests that ran and any justified expectation change. The rung-3 scenario landed, or the follow-up ticket. Ignored assertions with their bug ticket. Figma deviations you could not reconcile.
+
+## Live tests
+Only on a `needs-real-claude` ticket. The live methods the gate should run, one qualified name per line, as `device-tests.md` describes. Omit on other tickets.
 
 ## Documentation handoff
 Pending items for the documentation stage, with path and section. Omit when the ticket has none.
