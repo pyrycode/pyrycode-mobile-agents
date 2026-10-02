@@ -129,3 +129,11 @@ at most twice. Claude's scrubbed stderr goes into the error comment. A verifier
 pass is reused for 24 hours on identical merged content unless
 `PYRY_VERIFIER_GATE_REUSE=0`. No local setting is required. A running
 dispatcher keeps its loaded code until its next launch.
+
+## Prompt on stdin, 2026-10-02
+
+agent-dispatcher#104 passes the prompt file to stdin-reading runners, such as
+the Claude source review, as the child's stdin file descriptor. It was piped in
+after spawn, and a busy dispatcher could miss the Claude CLI's 3-second stdin
+window, as Mobile #1432's source review did right after a restart. No local
+setting is required.
