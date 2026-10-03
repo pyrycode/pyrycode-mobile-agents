@@ -97,14 +97,13 @@ A ticket ships as one ticket only if every line of this table holds. It is the s
 
 | Limit | Boundary |
 |---|---|
-| Production source files created or modified | ≤ 8 |
 | Total written work: production, tests, helpers, per-branch log calls and plan edits | ≤ 1600 lines |
 | New exported types, interfaces, composables or ViewModels | ≤ 5 |
 | Consumer call sites needing simultaneous update | ≤ 10 |
 | Acceptance criteria | ≤ 5 |
 | Distinct error or reject branches in a state machine | ≤ 10 |
 
-Production source files are `*.kt` files under `app/src/main/`. Tests under `app/src/test/`, `app/src/sharedTest/` and `app/src/androidTest/`, Markdown files and the plan do not count toward that line. Resource XML counts toward written lines only.
+Resource XML counts toward written lines.
 
 Count total written work, not production lines. Tests are most of it, and each test is its own edit-and-debug cycle. On 2026-05-16 three upstream plans sized by production lines came in at 541, 596 and 1071 lines and all needed salvage, which is why the table counts everything and carries a reject-branch line. Refiner estimates have run 1.4 to 3 times below the measured size.
 
@@ -114,7 +113,7 @@ Before trusting a forecast, check the evidence it rests on. Read a merged blocke
 
 The numbers are a hard boundary, and the raw count decides. Do not recount call sites as "really" fewer because the edits look mechanical, or treat tests and log calls as free. Each edit still means reading the consumer, building and checking. Pyrycode #75 counted 26 call sites, called them mechanical and sized itself small, then exhausted its budget on the cascade. If you find yourself writing that argument, split instead.
 
-The ceilings were raised on 2026-09-23 for Opus 5.5, from 800 lines and five files, on measured headroom. Do not stretch them further because the budget looks generous: Gradle is slow, and the verifier's checks and every rework loop grow with the ticket. The measurement and its re-measure trigger are in the refiner's sizing guide.
+The line ceiling was raised on 2026-09-23 for Opus 5.5, from 800 lines, on measured headroom, and the file ceiling was removed on 2026-10-03. Do not stretch them further because the budget looks generous: Gradle is slow, and the verifier's checks and every rework loop grow with the ticket. The measurement and its re-measure trigger are in the refiner's sizing guide.
 
 Re-apply the table to the refiner's body too, not only to your sketch: files named across packages, criteria, and deliverables in the story. You may find the work smaller than the estimate, never larger. Oversized work goes back for a split; there has been no larger tier since 2026-05-02.
 
@@ -176,7 +175,7 @@ On a `security-sensitive` ticket, run the adversarial pass in `security-review.m
 
 ### Commit the plan
 
-Re-count the table against the plan you actually wrote. A sketch and a finished plan are two measurements, and only the second is real; pyrycode #311 claimed four files and 80 lines and landed 13 files and over 300 lines. If a line is exceeded, do not commit the plan or start Phase B. Propose the split as `handoffs.md` describes, pointing at seams in your Design section.
+Re-count the table against the plan you actually wrote. A sketch and a finished plan are two measurements, and only the second is real; pyrycode #311 claimed 80 lines and landed over 300. If a line is exceeded, do not commit the plan or start Phase B. Propose the split as `handoffs.md` describes, pointing at seams in your Design section.
 
 If the table holds, commit the plan before any implementation code:
 
