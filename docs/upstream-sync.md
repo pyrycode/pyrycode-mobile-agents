@@ -68,8 +68,8 @@ change if either rate rises.
 
 ## Mobile-only: larger tickets and budgets for Opus 5.5 (2026-09-23)
 
-The refiner and builder split at 1600 lines and eight production files, up from 800
-and five. The other lines of the table are unchanged. The local `.env` sets
+The refiner and builder split at 1600 lines, up from 800. Their file ceiling, raised
+to eight here, was removed on all three forks on 2026-10-03. The other lines of the table are unchanged. The local `.env` sets
 `PYRY_BUDGET_SCALE=1.5`, a shared dispatcher setting that multiplies every agent's
 turn and time budget. The builder gets 300 turns and 60 minutes, the verifier 225 and
 60, the refiner 203 and 30, and documentation 203 and 38. Pyrycode and Desktop do

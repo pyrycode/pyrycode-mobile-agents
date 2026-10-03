@@ -4,7 +4,7 @@ The measurements behind the refiner's sizing guide. A refiner or builder does no
 
 ## The current ceilings, 2026-09-23
 
-The line and file ceilings were raised for Opus 5.5 from 800 lines and five production files to 1600 and eight, and every agent's turn and time budget by half through `PYRY_BUDGET_SCALE=1.5`. The builder's wall clock rose again on 2026-09-29.
+The line and file ceilings were raised for Opus 5.5 from 800 lines and five production files to 1600 and eight, and every agent's turn and time budget by half through `PYRY_BUDGET_SCALE=1.5`. The builder's wall clock rose again on 2026-09-29. The file ceiling was removed on 2026-10-03 on all three builder-set forks. File count measured how a change is wired rather than how much work it is: one new desktop event type forces a one-line case in about eight files. It did not bound the tail either: desktop #1249, estimated at 1300 lines over 12 files, built inside the budget.
 
 The first 50 Opus 5.5 builder runs on this fork, from the evening of 2026-09-22, used a median of 35 turns and 4.5 minutes and a heaviest of 66 turns and 12 minutes, a third of the old 200-turn, 40-minute budget. The largest ticket, 1298 added lines, took 52 turns and 10 minutes, where the previous model needed 115 to 145 turns and 18 to 29 minutes for tickets of about 1700 lines. No run needed its continuation leg.
 

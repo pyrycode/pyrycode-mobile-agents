@@ -162,16 +162,15 @@ A ticket ships as one ticket only if every line holds. Exceeding any one means a
 
 | Limit | Boundary |
 |---|---|
-| Production source files created or modified | ≤ 8 |
 | Total written work (production + tests + helpers + per-branch log calls + plan-doc edits) | ≤ 1600 lines |
 | New exported types, interfaces, composables or ViewModels | ≤ 5 |
 | Consumer call sites needing simultaneous update | ≤ 10 |
 | Acceptance criteria | ≤ 5 |
 | Distinct error or reject branches in a state machine | ≤ 10 |
 
-Production source files are `*.kt` files under `app/src/main/`. Tests under `app/src/test/`, `app/src/sharedTest/` and `app/src/androidTest/`, Markdown and the plan file do not count. Resource XML under `app/src/main/res/` counts toward written lines, not files.
+Resource XML under `app/src/main/res/` counts toward written lines.
 
-The builder applies the same table twice: to your body before planning and to its own plan before committing it. One set of numbers is what stops tickets bouncing between columns over units. The line and file ceilings were raised from 800 and five on 2026-09-23 after the first Opus 5.5 builder runs used a third of their budget; the call-site, reject-branch and exported-type lines were not raised, because they guard coupling and verifiability rather than budget. The measurements, and when to re-measure, are in `sizing-history.md`.
+The builder applies the same table twice: to your body before planning and to its own plan before committing it. One set of numbers is what stops tickets bouncing between columns over units. The line ceiling was raised from 800 on 2026-09-23 after the first Opus 5.5 builder runs used a third of their budget. The file ceiling was removed on 2026-10-03, because it measured how a change is wired rather than how much work it is. The call-site, reject-branch and exported-type lines were not raised, because they guard coupling and verifiability rather than budget. The measurements, and when to re-measure, are in `sizing-history.md`.
 
 **Trim before you size.** A body that arrives with more than five criteria is cut to one criterion per distinct observable behaviour, then sized. A long list is a fact about the write-up, not the work: split for criteria only when more than five distinct behaviours remain after trimming.
 
