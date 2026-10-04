@@ -1,0 +1,91 @@
+// Pyrycode pipeline build slots, 2026-10-04. Installed in ~/.gradle/init.d, so every Gradle build on this
+// machine reads it, but only pipeline builds take part: those whose project lives under a
+// `.pyrycode-worktrees` folder, where the dispatcher puts every agent, gate and sweep worktree. Builds you
+// start yourself, in Android Studio or a terminal, are untouched.
+//
+// Why: three agents compiling at once each hold a Gradle daemon and a Kotlin daemon, up to about 4 GB, and
+// pushed the 24 GB MacBook into swap until builds crawled into their time limits. Overlapping check runs
+// took 13 to 14 minutes each against 7 alone (2026-09-22), so queuing costs little. A pipeline build takes
+// one of SLOTS machine-wide places before it configures and gives it back when the build ends. Emulator
+// test runs are left out: the test script's own device hold already queues them one at a time.
+//
+// It fails open. After MAX_WAIT_MINUTES the build goes ahead without a place, and any error in this
+// script is logged and ignored, so it can slow a build down but never break one.
+// The places are kernel file locks, so a killed build or daemon releases its place at once.
+
+import java.nio.channels.FileChannel
+import java.nio.channels.OverlappingFileLockException
+import java.nio.file.StandardOpenOption
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
+
+abstract class PyryBuildSlot implements BuildService<BuildServiceParameters.None>, AutoCloseable {
+    Object held
+
+    @Override
+    void close() {
+        try { held?.release() } catch (ignored) {}
+        try { held?.channel()?.close() } catch (ignored) {}
+        System.properties.remove("pyry.buildSlot.held")
+    }
+}
+
+def SLOTS = 2
+def MAX_WAIT_MINUTES = 20
+// A device test run, such as pixel2Api33AtdDebugAndroidTest or connectedDebugAndroidTest. Not the compile
+// and assemble tasks that also end in AndroidTest.
+def DEVICE_TASK = ~/(?!assemble|compile|bundle|package|merge|process|generate|lint|check|test)[A-Za-z0-9]*AndroidTest/
+
+try {
+    def start = gradle.startParameter
+    def root = (start.projectDir ?: start.currentDir).canonicalPath
+    def slots = (start.systemPropertiesArgs["pyry.buildSlots"] ?: "$SLOTS") as int
+    def deviceRun = start.taskNames.any { DEVICE_TASK.matcher(it.tokenize(":").last()).matches() }
+    if (gradle.parent == null && root.contains("/.pyrycode-worktrees/") && !deviceRun) {
+        // A place this daemon still holds from an earlier build that never closed it.
+        def leaked = System.properties.get("pyry.buildSlot.held")
+        if (leaked != null) {
+            try { leaked.release(); leaked.channel().close() } catch (ignored) {}
+            System.properties.remove("pyry.buildSlot.held")
+        }
+        def dir = new File(gradle.gradleUserHomeDir, "pyry-build-slots")
+        dir.mkdirs()
+        def began = System.currentTimeMillis()
+        def deadline = began + MAX_WAIT_MINUTES * 60_000L
+        def nextNote = began
+        def lock = null
+        while (lock == null) {
+            for (i in 1..slots) {
+                def channel = FileChannel.open(new File(dir, "slot-${i}.lock").toPath(),
+                        StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+                try {
+                    lock = channel.tryLock()
+                } catch (OverlappingFileLockException ignored) {
+                    lock = null
+                }
+                if (lock != null) break
+                channel.close()
+            }
+            if (lock != null) break
+            def now = System.currentTimeMillis()
+            if (now >= deadline) {
+                println "Pyrycode build slots: no place after ${MAX_WAIT_MINUTES} minutes; building without one."
+                break
+            }
+            if (now >= nextNote) {
+                println "Pyrycode build slots: all ${slots} places are taken by other pipeline builds; waiting (${(now - began).intdiv(60_000)} min so far)."
+                nextNote = now + 60_000L
+            }
+            Thread.sleep(5_000L)
+        }
+        if (lock != null) {
+            System.properties.put("pyry.buildSlot.held", lock)
+            def waited = (System.currentTimeMillis() - began).intdiv(1000)
+            if (waited > 0) println "Pyrycode build slots: got a place after ${waited} s."
+            def service = gradle.sharedServices.registerIfAbsent("pyryBuildSlot", PyryBuildSlot) {}.get()
+            service.held = lock
+        }
+    }
+} catch (Throwable error) {
+    println "Pyrycode build slots: skipped after an error, building without a place: ${error}"
+}
