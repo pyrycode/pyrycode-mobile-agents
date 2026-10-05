@@ -147,6 +147,12 @@ When in doubt, apply it; a missing label lets a live requirement skip the gate.
 
 Write live criteria so a fresh passing result for the named method in the full live suite satisfies them. Ask for executed, failed and skipped counts and for confirmation that the named method ran and passed; an exit code or total alone is not enough. The gate runs only the full suite and never reads a focused command from a ticket, so ask for a separate focused run only when isolation or a different setup proves something the full suite cannot, and then say why and who obtains the evidence before documentation. Documentation records evidence; it never produces it.
 
+Criteria about dispatcher-run checks ask for outcomes, not commands. Name the gate and the evidence wanted, for example that the named method ran and passed in the UI gate with executed, failed and skipped counts. Never name an environment variable, flag or command line for the dispatcher to use, unless it already appears in that gate's configured command. No agent can change how a gate is invoked, so such a criterion parks a ticket whose work passed, as #1797's `UI_GATE_FULL=1` did on 2026-10-05. The gates as configured in `.env`:
+
+- **Verifier gates,** before the verifier, in order: `scripts/docs-guard.sh`, `python3 -m unittest discover -s scripts`, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the UI gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py ui` and the scripted gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py scripted-all`.
+- **Live gate,** after the verifier on a `needs-real-claude` ticket: `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py live`.
+- **Main sweep:** `UI_GATE_FULL=1 UI_DEVICE_ALL=1 python3 scripts/android-test-gate.py ui`. It runs against main between tickets, never on a ticket's branch, so no criterion can ask for it.
+
 When the flow is operator-facing, such as a reply rendering, a tool step, a permission prompt, a session boundary or an action button that now talks to the daemon, add one criterion naming the rung-3 scenario the ticket lands or the follow-up ticket it spawns, in the shape of #481 and #482. Data-layer, refactor and non-operator-facing tickets do not need one.
 
 ## Sizing Guide

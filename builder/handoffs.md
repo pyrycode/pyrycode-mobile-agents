@@ -1,6 +1,6 @@
 # Builder handoffs for Pyrycode Mobile
 
-Read this when a run has to route the ticket somewhere other than an ordinary PR: a split, a wait on another ticket, an out-of-scope bug, or an inherited format or lint failure. The table under "Labels and outcomes" in `CLAUDE.md` says which label or Codex outcome each one ends with. Under Codex, the shared practice's pipeline helpers replace the raw `gh` commands below, and for `needs_refinement` and `waiting_on_blocker` the dispatcher posts your summary as the comment.
+Read this when a run has to route the ticket somewhere other than an ordinary PR: a split, a wait on another ticket, an out-of-scope bug, or an inherited lint failure. The table under "Labels and outcomes" in `CLAUDE.md` says which label or Codex outcome each one ends with. Under Codex, the shared practice's pipeline helpers replace the raw `gh` commands below, and for `needs_refinement` and `waiting_on_blocker` the dispatcher posts your summary as the comment.
 
 Write every issue or comment body to a file outside the worktree first. The dispatcher commits anything left dirty in the worktree and pushes it to the feature branch.
 
@@ -82,13 +82,13 @@ When `CLAUDE.md`'s rule on bugs outside the ticket applies:
 
 If even the failing test cannot be written without the bug fix, which is rare, route the ticket back for refinement with a one-line explanation, so the refiner can sequence the bug ticket as a blocker.
 
-## Inherited format or lint failure
+## Inherited lint failure
 
-This covers a `spotlessCheck` or lint failure on files this PR did not change, found either by your own forced check before handoff or in a verifier triage verdict during rework.
+This covers a lint failure on files this PR did not change, found either by your own check before handoff or in a verifier triage verdict during rework. Spotless checks only the files this branch changes, so a format failure is never inherited; fix it in your diff.
 
-1. Confirm it is inherited. Compare every reported file and the formatter or lint configuration with `git merge-base HEAD origin/main`. If any of them changed in this PR, it is yours to fix. If none did, and the verifier has not already shown a matching red baseline, run the failing task with `--rerun-tasks` at the merge base, in a temporary worktree you remove afterwards.
+1. Confirm it is inherited. Compare every reported file and the lint configuration with `git merge-base HEAD origin/main`. If any of them changed in this PR, it is yours to fix. If none did, and the verifier has not already shown a matching red baseline, run the failing task with `--rerun-tasks` at the merge base, in a temporary worktree you remove afterwards.
 2. Find the fix ticket. In rework, use the one the verifier filed or linked. Otherwise search open issues for one that covers the same violation, and file one only if none does, giving the failing task, the exact paths and the baseline result. Put a new one on board 5 with the board steps above, in **In Development** when the fix is small and already diagnosed, otherwise in **Backlog**, so it is not left waiting for triage.
 3. Link the fix ticket as a blocker of this one, as in "Waiting on an in-flight ticket", and confirm both ends are issues.
 4. On Claude, comment naming the inherited failure and the blocker, and add `needs-rework:builder`. On Codex, return `waiting_on_blocker` with that explanation. Either way the ticket stays in In Development until the fix lands.
 
-Do not format unrelated files in this PR. After the fix lands, you run again: rerun the forced check and hand the PR back for fresh verification. This is the route #1277 needed for #1280. Approval rejections and missing access still end the run as `blocked`, not as a wait.
+Do not fix lint in unrelated files in this PR. After the fix lands, you run again: rerun the check and hand the PR back for fresh verification. This is the route #1277 needed for #1280. Approval rejections and missing access still end the run as `blocked`, not as a wait.
