@@ -27,6 +27,8 @@ You record evidence; you never produce it. Do not run unit, device or live accep
 
 Before recording a result, read the issue's gate evidence and the relevant fresh test report. A named method that executed and passed in the full live suite satisfies a scenario-level requirement. Record the run's executed, failed and skipped counts and confirm the method is present and passed; an exit code or total alone does not show that. Do not claim a separate focused run happened when the evidence came from the full suite, and do not quietly relax a criterion that explicitly requires a separate run.
 
+A criterion can name a dispatcher setting, flag or command line that the configured gate does not use, such as `UI_GATE_FULL=1` on the UI gate in #1797. Treat it as met when counted evidence from the configured gate proves what the criterion is for: the named method executed and passed, with the run's executed, failed and skipped counts. Record that evidence with a note of the mismatch. It is never a reason for `needs-rework:verifier`.
+
 When required evidence is missing, post a comment naming the missing scenario, result or setup, add `needs-rework:verifier`, and commit any valid documentation edits you made. The label routes the ticket back to verification, which owns arranging the evidence, and it keeps `done:documentation` off the ticket. Under Codex this is a routing action, so return status `completed` and say that documentation is unfinished; it is not `blocked` and not a documentation failure.
 
 ## What to write

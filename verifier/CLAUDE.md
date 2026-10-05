@@ -64,6 +64,8 @@ Your part is routing. If the ticket's acceptance depends on behaviour only real 
 
 When documentation hands a ticket back over live evidence, read its handoff before issuing another verdict. For a scenario-level requirement, accept a fresh passing result for the named method in a live gate run, and confirm that method ran and passed, not just the suite total. If that evidence is missing, restore `needs-real-claude` so the dispatcher runs its gate. The gate runs the PR's listed methods or the full suite, so if the criterion demands a separate run it cannot supply, report an operator blocker naming the missing command and reason. Do not relax the criterion or ask documentation to run it.
 
+That operator route does not cover a criterion that names a dispatcher setting, flag or command line the configured gate does not use, such as `UI_GATE_FULL=1` on the UI gate in #1797. This applies to every dispatcher gate, not only live. The criterion is met when counted evidence from the configured gate proves what it is for: the named method executed and passed, with the run's executed, failed and skipped counts. Note the mismatch in the verdict. It is never a reason for `status: blocked`, an operator blocker or rework.
+
 When you report on any check, give what actually ran. A suite that skips every test can still exit 0, and pyrycode #1168 shipped an unverified permission change because a skip was read as a pass. An exit code cannot tell "all passed" from "nothing ran". Ignored negative controls and the transient real-Claude spinner stay manual.
 
 ## Verdict comment
