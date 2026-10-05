@@ -38,6 +38,9 @@ As a [role], I want [feature] so that [benefit].
 ## Figma
 [UI-visible tickets only. Omit the section for non-visual work.]
 
+## Invariants
+[Ordering, merge and reconnect tickets only. Omit otherwise.]
+
 ## Acceptance Criteria
 - [ ] Criterion 1 (testable, specific)
 - [ ] ...
@@ -117,6 +120,21 @@ N/A, placeholder route; visual design lands in #<followup-ticket>.
 
 That escape is for genuine gaps, not a default. If the Figma file lacks a view the ticket needs, the ticket is not ready: file a ticket for the missing design or demote this one to Inbox with a comment asking Juhana to add the view, and do not refine the implementation yet.
 
+### Design-audit tickets
+
+A design audit compares built screens with their Figma frames and fixes what differs. The ticket must state two things, or the builder and the verifier never finish at the same place:
+
+- **A numeric tolerance** for each property compared, such as "positions and sizes within 2 dp of the frame, spacing within 4 dp, colours and type styles exactly the frame's tokens". Pick numbers the side-by-side capture can show at 1:1.
+- **The complete list of states to check**, each named with its frame. Name the code you swept to find them, such as a sealed `UiState` or a `when` over status values, so a state missing from the list is out of scope rather than a finding.
+
+A difference inside the tolerance, or in a state not on the list, is not a finding. #1431 to #1434, #1504 and #1619 had neither and caused 18 verifier FAILs between them. #1432 halted after three reworks, each pass checking one level deeper: first the frames, then the routing, then pixel measurements that earlier passes had accepted.
+
+### Ordering, merge and reconnect tickets
+
+A ticket that changes how rows are ordered, merged, deduplicated, replayed or restored across a reconnect lists its invariants first, in the `## Invariants` section above the acceptance criteria. An invariant is one rule that holds for every input, stated so a test can try to break it. Examples: "a row already drawn never moves above a row drawn before it", "a history page never drops a held row it overlaps", "after a reconnect each message appears once". Cover order, identity and duplicates, held state on both sides of a merge, and the reconnect boundary. Write the acceptance criteria against the invariants, not against one example sequence. Invariants do not count as acceptance criteria.
+
+#1642 failed eight verifier reviews, #1782 four and #1655 three, each round finding an ordering case the examples had not ruled out. Add the `trial:invariant-probes` label with the section. It tells the builder to write the verifier's probe-style tests before handoff, and marks the ticket for the trial in `$AGENTS_REPO_PATH/docs/invariant-probe-trial.md`.
+
 ### Documentation handoff
 
 Code and test criteria belong to the builder and verifier. Documentation requirements go in the `## Documentation handoff` section, which the documentation stage owns and must satisfy before it completes. Keep the requested path, section and any required wording there, including reference documentation the ticket names outside `docs/knowledge/`. Do not drop a documentation requirement, and do not split a code ticket only because it also needs documentation.
@@ -149,7 +167,7 @@ Write live criteria so a fresh passing result for the named method in the full l
 
 Criteria about dispatcher-run checks ask for outcomes, not commands. Name the gate and the evidence wanted, for example that the named method ran and passed in the UI gate with executed, failed and skipped counts. Never name an environment variable, flag or command line for the dispatcher to use, unless it already appears in that gate's configured command. No agent can change how a gate is invoked, so such a criterion parks a ticket whose work passed, as #1797's `UI_GATE_FULL=1` did on 2026-10-05. The gates as configured in `.env`:
 
-- **Verifier gates,** before the verifier, in order: `scripts/docs-guard.sh`, `python3 -m unittest discover -s scripts`, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the UI gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py ui` and the scripted gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py scripted-all`.
+- **Verifier gates,** before the verifier, in order: `python3 scripts/pre-verify.py`, `scripts/docs-guard.sh`, `python3 -m unittest discover -s scripts`, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the UI gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py ui` and the scripted gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py scripted-all`.
 - **Live gate,** after the verifier on a `needs-real-claude` ticket: `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py live`.
 - **Main sweep:** `UI_GATE_FULL=1 UI_DEVICE_ALL=1 python3 scripts/android-test-gate.py ui`. It runs against main between tickets, never on a ticket's branch, so no criterion can ask for it.
 
