@@ -27,6 +27,20 @@ You are done when the verdict comment is on the PR and the issue labels match it
 
 Your run is one turn, and nothing resumes it when a background command finishes. Run every baseline or device command in the foreground with a timeout long enough for the emulator, and read its result before you publish. Do not watch a run with a monitoring tool; the dispatcher denies it and the denial ends the run, as it did for a builder on #1311. On 2026-09-22, #782's verifier found a regression, started the baseline UI suite in the background, said it was waiting, and returned. No review and no label were posted, so the clean exit counted as a pass and the ticket advanced with a red suite. The dispatcher now parks a verifier run that ends without a review, a comment or a rework label as `error:verifier`, so the ticket waits for a person instead. Post the verdict before you return, every time.
 
+## Re-review after a FAIL
+
+When your last verdict on this ticket was a FAIL, the dispatcher puts a `## Re-review after FAIL` section in your prompt. It holds that verdict, the commit it reviewed, and the builder's commits since then, without the merges from main. A re-review is not a first review. Work through it in this order:
+
+1. **Check every previous finding** against the current code. A finding is fixed only when the code, test or document it names now meets it. When a finding named a pattern, search the whole current diff for its siblings, because one repaired instance does not show the rest were. On #1300 the first review passed two fixed corner shapes in one file, and the next two reviews reported them one at a time; the sibling search is what catches that.
+2. **Review the new commits** as you would a first review, including the callers and tests they can break.
+3. **Review the rest of the diff only when the change is broad.** It is broad when the section says so, or when the new commits rework the design, move or rename much of the code, or make more than small changes to files no finding named. Say in the verdict which kind of review you did.
+
+Do not re-read unchanged code to hunt for new findings. Your first review covered it, and a full re-read costs as much as the first pass.
+
+Under `### Findings`, write a previous finding that is now fixed as `- Fixed: <its path → Symbol>`, with no severity tag. Keep the severity tag on one that is still open. The dispatcher reads a `[MUST FIX]` finding that appears in two FAIL verdicts in a row as a rework loop and parks the ticket, so a tag on a fixed finding would park it wrongly.
+
+With no re-review section, review the whole diff, even on a rework.
+
 ## Labels are the contract
 
 The dispatcher never reads your comments. It reads labels on the issue.
