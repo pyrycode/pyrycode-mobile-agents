@@ -6,7 +6,7 @@ The practice shared by every role is in `$AGENTS_REPO_PATH/docs/working-practice
 
 Four files beside this one hold detail that only some runs need. Read each one when its situation arises, not before:
 
-- `$AGENTS_REPO_PATH/builder/handoffs.md` when you need to split the ticket, wait on another ticket, file an out-of-scope bug, or handle an inherited format or lint failure.
+- `$AGENTS_REPO_PATH/builder/handoffs.md` when you need to split the ticket, wait on another ticket, file an out-of-scope bug, or handle an inherited lint failure.
 - `$AGENTS_REPO_PATH/builder/ui-work.md` when the ticket is UI-visible or has a `## Figma` section.
 - `$AGENTS_REPO_PATH/builder/device-tests.md` when you add or change a test under `app/src/androidTest/`, change a scripted stream scenario, land a real-Claude scenario, or need the emulator tiebreaker for a shared screen test.
 - `$AGENTS_REPO_PATH/builder/security-review.md` when the issue carries the `security-sensitive` label.
@@ -68,7 +68,7 @@ The dispatcher reads GitHub labels and, under Codex, your structured outcome. It
 | Ticket too large, already a grandchild | Add `needs-human:sizing` with a comment, then keep building | Same |
 | Real dependency on an in-flight ticket | Link the blocker, comment, add `needs-rework:refiner` | Link the blocker, return `waiting_on_blocker` |
 | UI-visible work with no `## Figma` section, a ticket too vague to plan, or a missing `Estimate:` line | Comment naming what is missing, add `needs-rework:refiner` | Return `needs_refinement` naming what is missing |
-| Inherited format or lint failure on unchanged code | Link the fix ticket as a blocker, comment, add `needs-rework:builder` | Link the fix ticket, return `waiting_on_blocker` |
+| Inherited lint failure on unchanged code | Link the fix ticket as a blocker, comment, add `needs-rework:builder` | Link the fix ticket, return `waiting_on_blocker` |
 | A denied or rejected operation, or a missing tool or file the role requires | One message naming it, then end the turn | Return `blocked` |
 
 Under Codex, the dispatcher posts your summary as the ticket comment and applies the routing label for `needs_refinement` and `waiting_on_blocker`. Do not post that comment or add `needs-rework:refiner` yourself. The procedures behind the routing rows are in `handoffs.md`.
@@ -234,13 +234,13 @@ Run focused checks for the behaviour you changed, including existing tests that 
 ./gradlew lint
 ./gradlew assembleDebug                    # also the dispatcher's salvage gate
 ./gradlew compileDebugAndroidTestKotlin    # when you touched app/src/androidTest/ or app/src/sharedTest/
-./gradlew spotlessApply                    # before committing; it also formats Markdown, including the plan
+./gradlew spotlessApply                    # before committing; formats only files changed against origin/main, the plan included
 ./gradlew spotlessCheck --rerun-tasks --console=plain   # before handoff; forced so a cached green cannot hide a failure
 ```
 
 The aggregate `test` task does not accept `--tests` in this project, so scope `testDebugUnitTest` instead. Do not run the whole-project `./gradlew test` or `./gradlew check` as a final sweep. After your PR opens, the dispatcher runs the docs guard, the scripts' unit tests, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the device-only UI classes and every scripted scenario, and a red comes back to you already triaged. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. `assembleDebug` stays in your checks because it is the salvage gate and the only build of the code you did not write tests for.
 
-If `spotlessCheck` fails only on files unchanged since the merge base, that failure is inherited. Follow `handoffs.md` rather than formatting unrelated files in this PR.
+Spotless is ratcheted to `origin/main`, so `spotlessApply` and `spotlessCheck` cover only the files this branch changes. Run them as written; they never touch unrelated files. A Spotless failure is always in your diff and yours to fix.
 
 On visual changes, also run the existing layout and interaction coverage for the screen, as `ui-work.md` describes. For device-only tests and scripted scenarios, `device-tests.md` has the focused commands and the evidence to record.
 
@@ -281,7 +281,7 @@ If you find a bug whose fix needs production code outside the ticket's scope, do
 
 When the ticket comes back with `needs-rework:builder`, read the verifier's verdict comment on the PR first.
 
-- **From triage of a red gate,** the verdict separates regressions this PR caused from pre-existing failures. Fix the regressions in your diff. The verifier has already filed or linked tickets for pre-existing failures; fixing them here is out of scope. For an inherited format or lint failure on unchanged code, follow `handoffs.md`.
+- **From triage of a red gate,** the verdict separates regressions this PR caused from pre-existing failures. Fix the regressions in your diff. The verifier has already filed or linked tickets for pre-existing failures; fixing them here is out of scope. For an inherited lint failure on unchanged code, follow `handoffs.md`.
 - **From review,** fix every MUST FIX and address the SHOULD FIX findings. Three or more left unfixed fails the next review. If a finding names a gap in the plan's security review, revise that section and record the change under `## Revisions` rather than patching code under an unaudited design.
 - **A device or scripted failure** names its method or scenario. Reproduce it with the focused command in `device-tests.md` and rerun it after the repair.
 - **A live failure** names a real-Claude method. After the repair, run that method through `python3 scripts/android-test-gate.py live --tests "<Class#method>"`, as `device-tests.md` describes. Paste the executed and passed counts, the selected method and the fresh evidence path into the PR and final handoff. A zero-test run or an environment error is not a pass. The full live suite remains dispatcher work. Never print a secret or the environment.

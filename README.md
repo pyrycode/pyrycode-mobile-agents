@@ -35,7 +35,7 @@ pyrycode-mobile-agents/
 ├── refiner/sizing-history.md # Builder set: the measurements behind the sizing numbers
 ├── builder/CLAUDE.md         # Builder set — plan, then implement, in one warm session
 ├── builder/security-review.md # Builder set — the adversarial checklist on security-sensitive plans
-├── builder/handoffs.md       # Builder set: splits, blocker waits, out-of-scope bugs, inherited format failures
+├── builder/handoffs.md       # Builder set: splits, blocker waits, out-of-scope bugs, inherited lint failures
 ├── builder/ui-work.md        # Builder set: Figma reading, Compose translation and visual checks on UI tickets
 ├── builder/device-tests.md   # Builder set: focused emulator runs, scripted scenarios and the real-Claude harness
 ├── verifier/CLAUDE.md        # Builder set: verifier run flow, label contract and verdict format
