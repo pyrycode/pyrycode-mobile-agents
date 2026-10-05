@@ -18,6 +18,7 @@ A successful run ends with all of these on the remote:
 - A plan at `docs/specs/architecture/<ticket>-<slug>.md`, committed before any implementation code.
 - The implementation and its tests, committed on `feature/<ticket>` and pushed.
 - Focused checks for the behaviour you changed, green, with their results in the PR.
+- The final checks after the last merge of main, green, including `scripts/pre-verify.py`.
 - An open PR that closes the ticket, carrying the sections described under "Pull request" below.
 
 The dispatcher then adds `done:builder` and moves the ticket to In Code Review. After a clean exit it checks that `feature/<ticket>` has an open PR. A clean exit with no PR and no rework label is parked as an error, because on 2026-09-24 pyrycode #2569 ended its turn saying it would push once a suite finished, and the ticket reached Done with nothing merged.
@@ -30,7 +31,7 @@ Your run ends when you stop, and nothing resumes it when a background command fi
 
 The dispatcher chooses the runner, model and effort before launch. On Claude the configured budget is 300 turns and 70 minutes of wall clock, and a run that exhausts it gets one continuation leg before salvage. On Codex only the 70-minute wall clock applies and there is no continuation. Mobile's effort policy by role and risk is in `$AGENTS_REPO_PATH/docs/effort-trial.md`.
 
-Wall clock is the limit that binds. Pipeline Gradle builds share two machine-wide places and queue for them, printing `Pyrycode build slots:` lines while they wait; keep a Gradle command's output in its result, not in a file, so the dispatcher can add the waiting back to your limit. `device-tests.md` has the same rule for device runs. The first Gradle call in a fresh worktree is cold and takes several minutes, and the two builders that timed out on 2026-09-29 had already reached final verification. If you are near the limit, commit and push what stands: a coherent partial state on the remote is recoverable, and an uncommitted tree is not. Do not spend the last minutes on a whole-suite run. That is the verifier's gate, and pyrycode #1066 lost a finished run to it.
+Wall clock is the limit that binds. Pipeline Gradle builds share two machine-wide places and queue for them, printing `Pyrycode build slots:` lines while they wait; keep a Gradle command's output in its result, not in a file, so the dispatcher can add the waiting back to your limit. `device-tests.md` has the same rule for device runs. The first Gradle call in a fresh worktree is cold and takes several minutes, and the two builders that timed out on 2026-09-29 had already reached final verification. If you are near the limit, commit and push what stands: a coherent partial state on the remote is recoverable, and an uncommitted tree is not. Push before the final checks under "Final checks after the last merge of main", so a run that ends during them loses nothing; pyrycode #1066 lost a finished run to a whole-suite run it had not pushed first.
 
 Effort never relaxes the required tests or acceptance criteria. If investigation shows a risk the ticket's `## Effort assessment` missed, update that section with the concrete evidence and say so in the PR. The running session's effort does not change.
 
@@ -203,6 +204,12 @@ Write the failing test first and watch it fail for the right reason, then write 
 
 An operator-facing happy-path flow is done only with its real-Claude scenario. That means anything the operator exercises live on the phone: a reply rendering, a tool step, a permission prompt, a session boundary, or an action button that now talks to the daemon. Either land a rung-3 scenario on `InteractiveStreamE2ETest` with the feature, or file a follow-up ticket in the #481 and #482 shape: one `@Test` scenario, sized small, `@Ignore`-gated if its signal is transient. Add the rung-4 deterministic twin where a scripted fixture can hold the state open. `device-tests.md` has the harness detail. The verifier fails an operator-facing flow that has neither. Data-layer, refactor and other non-operator-facing tickets do not need one.
 
+### Invariant probes: a trial on ordering tickets
+
+This applies only to a ticket labelled `trial:invariant-probes`. The refiner adds that label to ordering, merge and reconnect tickets, together with an `## Invariants` section. The trial started on 2026-10-05 and is measured as `$AGENTS_REPO_PATH/docs/invariant-probe-trial.md` describes.
+
+On these tickets the verifier probes the merge with edge cases until one breaks. #1642 failed eight reviews, #1782 four and #1655 three, each on an ordering case nobody had tested. Write those probes yourself before handoff. For each listed invariant, add unit tests that try to break it the way a reviewer would: the same rows arriving in another order, a page overlapping held rows at its start, middle and end, a duplicate or replayed row, two identities sharing one key, an empty and a one-row page, and a reconnect between any two steps. Drive the real production function, name each test after the invariant it guards, and keep each one small. A probe that fails is a design bug: fix the design and record it under `## Revisions`, never weaken the probe. The probes count toward the size table like any test. List each invariant with its tests in the PR body under `## Invariant probes`, one line each.
+
 ### Code rules
 
 The verifier's full criteria are in `$AGENTS_REPO_PATH/verifier/review-criteria.md`. These are the ones a builder most often trips:
@@ -238,13 +245,27 @@ Run focused checks for the behaviour you changed, including existing tests that 
 ./gradlew spotlessCheck --rerun-tasks --console=plain   # before handoff; forced so a cached green cannot hide a failure
 ```
 
-The aggregate `test` task does not accept `--tests` in this project, so scope `testDebugUnitTest` instead. Do not run the whole-project `./gradlew test` or `./gradlew check` as a final sweep. After your PR opens, the dispatcher runs the docs guard, the scripts' unit tests, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the device-only UI classes and every scripted scenario, and a red comes back to you already triaged. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. `assembleDebug` stays in your checks because it is the salvage gate and the only build of the code you did not write tests for.
+The aggregate `test` task does not accept `--tests` in this project, so scope `testDebugUnitTest` instead. Do not run `./gradlew check` yourself: the final checks below cover its unit suite and Spotless, and lint ran above. After your PR opens, the dispatcher runs the docs guard, the scripts' unit tests, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the device-only UI classes and every scripted scenario, and a red comes back to you already triaged. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. `assembleDebug` stays in your checks because it is the salvage gate and the only build of the code you did not write tests for.
 
 Spotless is ratcheted to `origin/main`, so `spotlessApply` and `spotlessCheck` cover only the files this branch changes. Run them as written; they never touch unrelated files. A Spotless failure is always in your diff and yours to fix.
 
 On visual changes, also run the existing layout and interaction coverage for the screen, as `ui-work.md` describes. For device-only tests and scripted scenarios, `device-tests.md` has the focused commands and the evidence to record.
 
 Do not watch a run with the Monitor tool. The dispatcher denies it, and the denial ends the run with `error:builder:permission_denied`, as it did on #1311 on 2026-10-01. If a command must run in the background, read its output file with ordinary shell reads.
+
+### Final checks after the last merge of main
+
+A branch that was green before a merge of main can fail formatting or compilation after it, and the verifier failed six PRs that way in the week to 2026-10-05. So when the work is done, merge `origin/main` into your branch one last time, settle any conflicts, commit and push. Write the PR body from the next section to `/tmp/builder-<ticket>/pr.md`. Then run, in the foreground:
+
+```bash
+./gradlew testDebugUnitTest --console=plain   # the whole unit and shared screen suite
+./gradlew assembleDebug --console=plain
+python3 scripts/pre-verify.py --gradle --body-file /tmp/builder-<ticket>/pr.md
+```
+
+The script checks that `origin/main` is merged, runs Spotless with a forced rerun and every Kotlin compile, then the checks the verifier otherwise fails on sight: the plan's `## Security review` on a `security-sensitive` ticket, new colour, text style and corner literals outside `ui/theme/`, the `## Live tests` list in the body, and ignored files such as `AGENTS.md` on the branch. It is also the dispatcher's first verifier gate, so a red you leave is a red the verifier sees. Fix every `FAIL` line, commit, push and run it again. A literal no theme token can replace, such as a brand colour the design names, ends its line with `// theme-literal: <reason>`, and the verifier judges the reason. Once the PR is open, run the script without `--body-file` after any edit to the body, so it reads the posted one.
+
+If main moves again while these run, do not chase it. The dispatcher merges main before the verifier and runs the full gates. Device suites stay with the dispatcher.
 
 ### Pull request
 
@@ -286,4 +307,4 @@ When the ticket comes back with `needs-rework:builder`, read the verifier's verd
 - **A device or scripted failure** names its method or scenario. Reproduce it with the focused command in `device-tests.md` and rerun it after the repair.
 - **A live failure** names a real-Claude method. After the repair, run that method through `python3 scripts/android-test-gate.py live --tests "<Class#method>"`, as `device-tests.md` describes. Paste the executed and passed counts, the selected method and the fresh evidence path into the PR and final handoff. A zero-test run or an environment error is not a pass. The full live suite remains dispatcher work. Never print a secret or the environment.
 
-Fix on the existing branch; the plan and code are already there, though the fresh worktree makes the first Gradle call cold again. Never rewrite the plan to match the code. When a finding changes the design, append a dated `## Revisions` entry: what changed, which finding drove it and the new contract. Then re-run the focused checks for the scope you touched, commit and push. The updated PR goes through the full gates and review again.
+Fix on the existing branch; the plan and code are already there, though the fresh worktree makes the first Gradle call cold again. Never rewrite the plan to match the code. When a finding changes the design, append a dated `## Revisions` entry: what changed, which finding drove it and the new contract. Then re-run the focused checks for the scope you touched and the final checks after the last merge of main, commit and push. The updated PR goes through the full gates and review again.

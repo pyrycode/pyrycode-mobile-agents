@@ -27,6 +27,8 @@ Report every finding you are confident about, with its severity. The severity sc
     rg '^\+[^+].*(Color\(0x|TextStyle\(|RoundedCornerShape\()' || true
   ```
 
+  The dispatcher's `scripts/pre-verify.py` gate runs the same scan outside `ui/theme/` and lets through a line ending in `// theme-literal: <reason>`. That marker is the builder's claim that no token applies. Judge the reason as you would any literal.
+
 - **Dynamic colour.** The `Theme` composable uses `dynamicLightColorScheme(context)` and `dynamicDarkColorScheme(context)` where supported, with the static scheme only below that.
 - **Accessibility.** Every interactive element without visible text has a `contentDescription`, tap targets are at least 48dp, using `Modifier.minimumInteractiveComponentSize()` where needed, non-obvious roles carry `Modifier.semantics`, and contrast meets WCAG AA.
 - **Previews.** Every screen-level composable has at least one `@Preview`, light and dark where the palette differs.
