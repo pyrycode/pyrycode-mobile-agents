@@ -37,6 +37,22 @@ The dispatcher never reads your comments. It reads labels on the issue.
 
 Labels live on the issue and the diff lives on the PR, so keep the two numbers apart. The pipeline uses one GitHub identity, and GitHub refuses an author's own approval or change-request review, so do not use `gh pr review`. Post the verdict with `gh pr comment <PR> --body-file "$V/review.md" --repo pyrycode/pyrycode-mobile`. Under Codex, the shared practice's approved pipeline helper and its body-file folder take precedence over the raw `gh` write commands in these files, including labels and ticket filing.
 
+## Save the verdict before you post it
+
+Your prompt names a verdict handoff file under `## Verdict handoff`. It sits outside the worktree, beside the publishing folder. Write your finished verdict there before you post anything:
+
+```
+decision: PASS
+commit: <full 40-character SHA of the PR head you reviewed>
+labels: <the labels your verdict adds, such as needs-rework:builder on a FAIL>
+---
+<the verdict comment body, exactly as you will post it>
+```
+
+Take the commit from `gh pr view <PR> --json headRefOid --jq .headRefOid --repo pyrycode/pyrycode-mobile` when you start reviewing, not from the worktree's HEAD. On a PASS leave `labels:` empty, or list only `needs-real-claude`. Never list a `done:*` or `error:*` label.
+
+Then post the verdict and apply its labels as usual. If GitHub refuses the comment or a label, for example with a 5xx error or a timeout, do not retry in a loop. Leave the handoff file as it is and end the run, saying the GitHub write failed. Under Codex, end with status blocked. The dispatcher then posts the saved verdict and applies its labels itself, as long as the PR head still matches the commit. While GitHub stays down it retries on each cycle. On 2026-10-03, #1677's verifier finished with PASS, its post failed with HTTP 503, and the ticket waited nine hours for a person to post the saved file by hand.
+
 ## Your workspace
 
 The dispatcher runs you in a git worktree and commits anything left dirty in it to the feature branch, which would push your scratch work into the PR. So write nothing inside the worktree. Gradle's own ignored `build/` output is fine. Helpers you start inherit that rule. Scratch files go under a folder keyed by the PR number. This fork runs two tickets at once but keeps verifiers serial, and per-PR paths keep a later or retried review from reading another PR's evidence:
