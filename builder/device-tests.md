@@ -4,7 +4,7 @@ Read this when you add or change a test under `app/src/androidTest/`, change a s
 
 ## Who runs what
 
-You run focused device checks while building and after each repair: one affected method or class on the managed device, or one scripted scenario. The dispatcher runs the full sets. Before the verifier it runs every device-only class under `app/src/androidTest/` outside the e2e package, through `python3 scripts/android-test-gate.py ui`, and all seven scripted scenarios through `scripted-all`. After the verifier passes a `needs-real-claude` ticket, it runs the live suite with `python3 scripts/android-test-gate.py live`. Do not run those full sets as a final sweep, and never run the live suite: it needs a Claude credential, a host daemon and real Claude turns. Do not copy credentials into your session or point a test at the production daemon. The shared practice has the setup and approval rules for device runs.
+You run focused device checks while building and after each repair: one affected method or class on the managed device, or one scripted scenario. The dispatcher runs the full sets. Before the verifier it runs every device-only class under `app/src/androidTest/` outside the e2e package, through `python3 scripts/android-test-gate.py ui`, and all seven scripted scenarios through `scripted-all`. After the verifier passes a `needs-real-claude` ticket, it runs the live suite with `python3 scripts/android-test-gate.py live`. Do not run those full sets as a final sweep. After a repair whose verifier finding names a live test, run that method through the live gate with `--tests`. The gate uses the restricted Dev Agents account to fetch the Claude login for its own test child. Never fetch or copy the login yourself, and never point a test at the production daemon. The shared practice has the setup and approval rules for device runs.
 
 ## Where a device test belongs
 
@@ -28,6 +28,14 @@ One method or class on the managed Android 13 device, from your worktree:
 
 Drop `#testMethod` to run the whole class. Keep the selection narrow. The task boots and tears down its own device, and `--rerun` forces a fresh run while keeping upstream build caching. If the worktree has no `local.properties`, Gradle needs `ANDROID_HOME`, which the dispatcher provides.
 
+One named live repair test:
+
+```bash
+python3 scripts/android-test-gate.py live --tests "de.pyryco.mobile.e2e.InteractiveStreamE2ETest#namedMethod"
+```
+
+Use the method the verifier named. If shared setup changed, list the smallest relevant set of live methods, separated by commas. Leave the full live suite to the dispatcher. The gate builds an isolated daemon from the configured sibling sources. A daemon prerequisite failure means those sources need the required merged change. Do not replace the production daemon. Missing account access or a missing login item is an environment blocker. Name it and report zero executed. Never print secrets, dump the environment or paste raw authentication output.
+
 One scripted stream scenario:
 
 ```bash
@@ -42,7 +50,7 @@ Run each in the foreground with a shell timeout long enough for the emulator, an
 
 A device run proves only what actually executed. After a run, read the fresh XML under `app/build/outputs/androidTest-results/managedDevice/debug/pixel2Api33Atd/` and confirm the selected cases ran without failures or skips. Compilation, a cached result or a run that executed zero tests proves nothing, and an exit code alone cannot tell "all passed" from "nothing ran".
 
-After a repair, rerun the failing method or scenario, then the whole affected class if the repair changed shared test setup. Record in the PR's Testing section the command, its exit status, the executed count and the evidence path. If setup or permissions block execution, report the concrete blocker and name the check that stayed unverified.
+After a repair, rerun the failing method or scenario, then the whole affected class if the repair changed shared test setup. Record in the PR's Testing section the command, its exit status, the executed and passed counts and the evidence path. If setup or permissions block execution, report the concrete blocker and name the check that stayed unverified.
 
 ## The real-Claude harness
 
