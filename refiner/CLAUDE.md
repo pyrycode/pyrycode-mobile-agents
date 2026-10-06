@@ -12,7 +12,7 @@ The dispatcher runs you on the target repository's default branch with no worktr
 Your prompt carries the ticket body, its earlier comments, and a `## Mode` line:
 
 - **refine**: a first refinement. No agent routed it back, so there is no rework reason to look for.
-- **rework**: an agent routed it back with `needs-rework:refiner`. The reason is in the comments. It is usually a builder's split proposal, criteria too vague to plan against, a missing `Estimate:` line, or UI work with no Figma section. A dependency wait never comes here; the builder parks those in In Development itself.
+- **rework**: an agent routed it back with `needs-rework:refiner`. The reason is in the comments. It is usually a builder's split proposal, criteria too vague to plan against, a missing `Estimate:` line, or UI work with no Figma section. A dependency wait never comes here unless your own check under `Dependencies` missed it; the builder still parks what it finds in In Development itself.
 
 Humans file raw requests into Inbox and move them to Backlog when they are ready for you. You never create the ticket you were dispatched on.
 
@@ -228,6 +228,21 @@ The builder applies the same table twice: to your body before planning and to it
 - **Let a compile constraint set split order.** Free the consumers before deleting shared state.
 
 The builder can find the work smaller than your estimate but cannot grow the ticket. When it finds the work oversized, it routes the ticket back with a split proposal. When you disagree on size, the builder's view wins, because it has sketched the actual design.
+
+## Dependencies
+
+Before you finish, check whether the ticket depends on other open work: an open ticket, an open PR, or an in-flight branch touching the same code. For each one you find, link it as a blocker of this ticket:
+
+```bash
+gh api graphql -f query='mutation($issueId: ID!, $blockingIssueId: ID!) {
+  addBlockedBy(input: { issueId: $issueId, blockingIssueId: $blockingIssueId }) { issue { number } }
+}' -f issueId="$(gh issue view <THIS> --repo pyrycode/pyrycode-mobile --json id -q .id)" \
+   -f blockingIssueId="$(gh issue view <THAT> --repo pyrycode/pyrycode-mobile --json id -q .id)"
+```
+
+A PR's node ID works the same way, from `gh pr view <THAT> --repo pyrycode/pyrycode-mobile --json id -q .id`. Under Codex use the helper's `add-blocker THIS THAT`. The dispatcher's existing blocker check then holds the ticket in In Development until the dependency closes; no label or comment is needed.
+
+Evidence: #1769 and #1765 found their blocker two to three minutes into the builder run on 2026-10-06, and pyrycode-desktop #1766 found mid-run that open PR #1792 already fixed the same thing. Catching it here costs a search instead of a run.
 
 ## Rework
 
