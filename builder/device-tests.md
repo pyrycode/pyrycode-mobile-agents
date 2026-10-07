@@ -34,7 +34,7 @@ One named live repair test:
 python3 scripts/android-test-gate.py live --tests "de.pyryco.mobile.e2e.InteractiveStreamE2ETest#namedMethod"
 ```
 
-Use the method the verifier named. If shared setup changed, list the smallest relevant set of live methods, separated by commas. Leave the full live suite to the dispatcher. The gate builds an isolated daemon from the configured sibling sources. A daemon prerequisite failure means those sources need the required merged change. Do not replace the production daemon. Missing account access or a missing login item is an environment blocker. Name it and report zero executed. Never print secrets, dump the environment or paste raw authentication output.
+Use the method the verifier named. If shared setup changed, list the smallest relevant set of live methods, separated by commas. Leave the full live suite to the dispatcher. The gate builds an isolated daemon from the configured sibling sources. A daemon prerequisite failure means those sources need the required merged change. Do not replace the production daemon. Missing account access or a missing login item is an environment blocker. Under Codex, run the live gate escalated per the shared practice's sandbox rule, because the login lookup cannot reach 1Password inside the sandbox. A login-unavailable message from a sandboxed run means rerun escalated, and it is an environment blocker only if the escalated run also fails. Name it and report zero executed. Never print secrets, dump the environment or paste raw authentication output.
 
 One scripted stream scenario:
 
