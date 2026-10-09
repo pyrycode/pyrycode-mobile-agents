@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+SCRIPT_DIR="$(cd -P "$(dirname "$0")" && pwd)"
+export PYRY_MOBILE_REPO="${1:-$SCRIPT_DIR/../../pyrycode-mobile}"
+cd "$SCRIPT_DIR/.."
+exec python3 -m unittest discover -s scripts -p 'test_*.py' -v

@@ -20,3 +20,7 @@ dispatch/
 
 # Manual .env backups (same secrets as .env — never commit)
 .env.bak-*
+
+# Python tool and test bytecode.
+__pycache__/
+*.py[cod]
