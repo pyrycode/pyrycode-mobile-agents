@@ -68,6 +68,19 @@ The "N/A with justification" escape exists for genuine gaps, not as a default. I
 
 **Why this matters.** Phase 1 shipped 28 tickets with no Figma references in the bodies; architect specs were written against `Plan.md` prose; developer agents produced generic M3 implementations that diverged from the locked Figma design. This rule closes that gap upstream: architect can't write a Figma-anchored spec without a Figma URL in the ticket; the chain breaks if PO doesn't establish the link.
 
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+Adapted from the block CodeGraph 1.6.2 writes into agent instruction files (`src/installer/instructions-template.ts`, github.com/colbymchenry/codegraph).
+
+This repository is indexed by CodeGraph. A ticket worktree gets its own copy of the index, and the codegraph server keeps it in step with your edits within about a second. Reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool:** `codegraph_explore` answers most code questions in one call: the relevant symbols' verbatim, line-numbered source, the call paths between them (including dynamic-dispatch hops grep can't follow) and a blast radius of what depends on them. Name a file or symbol in the query to read its current source. If it is listed but deferred, load it by name via tool search.
+- **Shell (always works):** `codegraph explore "<symbol names or question>"` prints the same output. For a complete list of call sites, `codegraph callers <symbol>`; for transitive dependents, `codegraph impact <symbol>`. The shell reads the index without updating it.
+
+Trust codegraph's results; don't re-verify them with grep. Use it instead of Read and grep; use grep only for string literals, comments, docs and your own new code. If a response starts with a staleness banner or flags a file as changed on disk, Read the files it lists. If there is no `.codegraph/` directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
+
 ## Before Refining
 
 1. Read `docs/knowledge/INDEX.md` for the startup map, then the owning topic and root `CLAUDE.md`.
@@ -113,7 +126,7 @@ If the ticket already has some of these sections, preserve their content unless 
 
 The builder reads the body against a later tree than the one you wrote it against, so a `PairingRepository.kt:315` in a body is stale before it is read. Measured 2026-09-07 upstream on pyrycode board #1: 45 of the 60 open tickets carried line citations, 311 in all, and every one audited had drifted; this board carries the same shape at a smaller scale. The relocation work costs a builder's budget and changes nothing about what gets built.
 
-- **Name the symbol.** Write ``the guard in `validatePairingPayload` ``, never `PairingRepository.kt:315`. Give the full path when the basename is ambiguous. `codegraph_search` resolves a name on demand and the name is still correct next week.
+- **Name the symbol.** Write ``the guard in `validatePairingPayload` ``, never `PairingRepository.kt:315`. Give the full path when the basename is ambiguous. `codegraph_explore` resolves a name on demand and the name is still correct next week.
 - **Cite a doc by heading or a distinctive phrase**, never a line number. The 2026-08-31 package-overview split moved every section into a new file and voided every `docs/` line number in the open tickets at once; a heading survived it.
 - **When a measurement matters, pin the commit and say so:** "405 lines at `6707df4d`". A number without a commit is a rumour by next week.
 - **Never write `PairingRepository.kt:NNN`, a range `PairingRepository.kt:120-140`, or a bare `:NNN`.** The builder's plan and code comments follow the same rule. This repo has no build guard for it, so the discipline is yours. A body that hands the builder a line teaches it the habit the rule exists to stop; upstream measured that a spec carrying dozens of citations produced a developer that wrote 71 of its own (pyrycode #1417).

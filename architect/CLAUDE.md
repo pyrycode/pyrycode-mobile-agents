@@ -26,7 +26,7 @@ Translate feature requirements into technical designs. Define interfaces, data f
    ```
    The `pyrycode-mobile-docs` collection may not exist yet — fall back to `pyrycode-docs` for cross-project pipeline lessons.
 4. Read `CLAUDE.md` at the `pyrycode/pyrycode-mobile` repo root — language conventions and stack choices live there.
-5. **Build code-side context with codegraph** (see § Codegraph below) — at minimum, run `codegraph_context "<ticket title + paraphrased AC>"` once. The result drives both the design itself AND the "Files to read first" list you'll write into the spec.
+5. **Build code-side context with codegraph** (see § CodeGraph below): at minimum, run `codegraph_explore` once with the ticket's key symbols or a question about the area. The result drives both the design itself AND the "Files to read first" list you'll write into the spec.
 
 ## Never Update
 
@@ -35,38 +35,39 @@ The architect writes specs under `docs/specs/architecture/` and, when warranted,
 - `docs/lessons.md` — frozen 2026-05-11
 - `docs/knowledge/INDEX.md` and `docs/knowledge/CATALOG.md` — documentation phase maintains these, no other pipeline role
 
-## Codegraph (use it before grep)
+<!-- CODEGRAPH_START -->
+## CodeGraph
 
-Pyrycode-mobile is indexed for codegraph; the `mcp__codegraph__codegraph_*` MCP tools are wired into your tool surface, and the dispatcher symlinks the canonical `.codegraph/` index into your worktree. **Default to codegraph for symbol-level questions; fall back to grep only when codegraph returns no useful results.** Each tool call is a turn — don't pay for both.
+Adapted from the block CodeGraph 1.6.2 writes into agent instruction files (`src/installer/instructions-template.ts`, github.com/colbymchenry/codegraph).
 
-Decision rules — use these aggressively, especially during the size check and "Files to read first" generation:
+This repository is indexed by CodeGraph. A ticket worktree gets its own copy of the index, and the codegraph server keeps it in step with your edits within about a second. Reach for it BEFORE grep/find or reading files when you need to understand or locate code:
 
-- **"What does this change affect?"** → `codegraph_impact <symbol>` — direct call sites + transitive dependents in one query. The edit fan-out check (§ 1) should drive off this, not grep.
-- **"Who calls this composable / function / method?"** → `codegraph_callers <symbol>` — the canonical replacement for `grep -rn '<name>('`.
-- **"What does this function call internally?"** → `codegraph_callees <symbol>` — useful before changing behaviour or extracting helpers.
-- **"Where is this defined; what's its signature; what's near it?"** → `codegraph_node <symbol>` — single-symbol details with structural context.
-- **"What's the relevant code surface for this ticket?"** → `codegraph_context "<ticket title + AC paraphrase>"` — the killer feature. Run this once at the start of every spec; let the result drive both your reading list and the spec's **Files to read first** section.
-- **"Does this name exist; what variants?"** → `codegraph_search <name>` — fast symbol lookup.
+- **MCP tool:** `codegraph_explore` answers most code questions in one call: the relevant symbols' verbatim, line-numbered source, the call paths between them (including dynamic-dispatch hops grep can't follow) and a blast radius of what depends on them. Name a file or symbol in the query to read its current source. If it is listed but deferred, load it by name via tool search.
+- **Shell (always works):** `codegraph explore "<symbol names or question>"` prints the same output. For a complete list of call sites, `codegraph callers <symbol>`; for transitive dependents, `codegraph impact <symbol>`. The shell reads the index without updating it.
 
-**When to fall back to grep / Read:**
+Trust codegraph's results; don't re-verify them with grep. Use it instead of Read and grep; use grep only for string literals, comments, docs and your own new code. If a response starts with a staleness banner or flags a file as changed on disk, Read the files it lists. If there is no `.codegraph/` directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
 
-- Comment-only references (codegraph parses code, not comments)
-- String literals (URLs, paths, log messages — grep them)
-- Documentation files (`docs/`, `CLAUDE.md`, vault notes — Read or QMD)
-- Codegraph returned empty results when you expected hits — note the gap, then grep
-- Your own pending edits within the worktree (the symlinked index reflects the canonical repo's state, not your in-flight changes)
+Use it aggressively during the size check and "Files to read first" generation:
+
+- **"What's the relevant code surface for this ticket?"** `codegraph_explore` with the ticket's key symbols or a question about the area. Run this once at the start of every spec; let the result drive both your reading list and the spec's **Files to read first** section.
+- **"What does this change affect? Who calls this composable / function / method?"** `codegraph_explore` naming the symbol: its blast radius gives callers per file and the tests that cover it. For the complete list when sizing, `codegraph callers <symbol>` in the shell; for transitive dependents, `codegraph impact <symbol>`. The edit fan-out check (§ 1) should drive off these, not grep.
+- **"What does this function call internally? Where is it defined, what's its signature?"** `codegraph_explore` naming the function: its source and call paths show what it calls.
+- **"Does this name exist; what variants?"** `codegraph_explore` naming the symbol, or `codegraph query <name>` in the shell.
+
+**When grep / Read is right:** comments, string literals (URLs, paths, log messages), documentation files (`docs/`, `CLAUDE.md`, vault notes: Read or QMD), and your own new code.
 
 **Smell phrases that signal you're skipping codegraph for grep without a reason:**
 
 - *"Just one quick grep — codegraph would be overkill"* (no — the cost is one turn either way; codegraph's output is structurally richer)
 - *"I'll grep first to see if I even need codegraph"* (codegraph IS the first reach)
-- *"Codegraph won't know about this; the code is too new"* (verify with a query — if it's empty, then grep)
+- *"Codegraph won't know about this; the code is too new"* (it follows your worktree, edits included; query it)
 
 The edit fan-out check (§ 1) and the **Files to read first** spec section (§ 2) are the two highest-leverage codegraph use sites. Skipping it there is the most expensive miss because both gate downstream developer turns.
 
 ## Citations — name the symbol, never the line
 
-Everywhere in the spec, including the reading list. Write ``the guard in `validatePairingPayload` `` rather than `PairingRepository.kt:315`. The developer resolves a name with `codegraph_search` faster than it opens a file at a line, and the name is still correct next week. A line number is stale the moment anything above it moves, and that happens within a single ticket's lifetime: you write the spec against one tree and the developer reads it against a later one. Upstream measured the cost: ~800 line citations accumulated repo-wide, 22 of them dead, and pure renumbering ate 35-49% of the added lines in some commits, exhausting two developer budgets outright (pyrycode #1417, #1452). A spec carrying dozens of citations also teaches the developer that this is how the house references code; on #1417 the developer wrote 71 of its own.
+Everywhere in the spec, including the reading list. Write ``the guard in `validatePairingPayload` `` rather than `PairingRepository.kt:315`. The developer resolves a name with `codegraph_explore` faster than it opens a file at a line, and the name is still correct next week. A line number is stale the moment anything above it moves, and that happens within a single ticket's lifetime: you write the spec against one tree and the developer reads it against a later one. Upstream measured the cost: ~800 line citations accumulated repo-wide, 22 of them dead, and pure renumbering ate 35-49% of the added lines in some commits, exhausting two developer budgets outright (pyrycode #1417, #1452). A spec carrying dozens of citations also teaches the developer that this is how the house references code; on #1417 the developer wrote 71 of its own.
 
 - No ranges either (`Foo.kt:120-140`). If a symbol name is not precise enough to locate what you mean, the declaration is too big, and saying so is more useful than a line number that navigates around it.
 - Never a bare `:NNN`.
@@ -133,16 +134,17 @@ Read the ticket body, skim the relevant code surface (the affected packages unde
 - Cross-package coordination where many imports flip simultaneously
 - Adding a parameter to a Compose composable that's called from many places
 
-If yes, count consumer call sites concretely. **Use `codegraph_impact <symbol>`** — it returns direct call sites + transitive dependents in one structured query, with file/line for each. Falling back to grep loses the dependent chain (you see direct call sites only and miss the cascade through helpers/wrappers):
+If yes, count consumer call sites concretely. **Use `codegraph_explore` naming the symbol**: its blast radius gives callers per file and the tests that cover them. Grep loses the dependent chain (you see direct call sites only and miss the cascade through helpers/wrappers):
 
 ```
-mcp__codegraph__codegraph_impact(symbol: "<symbol>")
+codegraph_explore(query: "<symbol>")
 ```
 
-Grep fallback (only when codegraph returns no results, e.g. for very fresh symbols not yet re-indexed):
+For the complete list when the count decides the size, use the shell:
 
 ```bash
-grep -rn <symbol> app/src/main/ app/src/test/ app/src/androidTest/
+codegraph callers <symbol>   # every call site, file:line
+codegraph impact <symbol>    # transitive dependents
 ```
 
 Sizing rule with edit fan-out:
@@ -273,7 +275,7 @@ When the blocker closes, `blockedBy` flips to CLOSED, the ticket auto-advances f
 Write the architecture spec to `docs/specs/architecture/{ticket}-{name}.md`.
 
 Each spec should include:
-- **Files to read first** — explicit reading list with paths, line ranges, and a one-line "what to extract" per entry. **Generate this from `codegraph_context`** at the start of your spec run, then prune/expand based on your design decisions. Required for every spec, not optional. Example:
+- **Files to read first**: explicit reading list with paths, line ranges, and a one-line "what to extract" per entry. **Generate this from `codegraph_explore`** (the ticket's key symbols or a question about the area) at the start of your spec run, then prune/expand based on your design decisions. Required for every spec, not optional. Example:
   - `app/src/main/java/de/pyryco/mobile/data/repository/ConversationRepository.kt:14-42` — `ConversationRepository` interface contract
   - `app/src/main/java/de/pyryco/mobile/data/repository/FakeConversationRepository.kt:1-60` — fake-impl pattern; new repo's tests should follow the same shape
   - `app/src/main/java/de/pyryco/mobile/ui/conversations/list/ChannelListScreen.kt` — how existing screens consume StateFlow; preserve the pattern
@@ -281,7 +283,7 @@ Each spec should include:
   - `gradle/libs.versions.toml` — confirm dependency already exists before requesting a new one
   - `docs/lessons.md` (if present) — relevant pitfalls for this area
 
-  This is the developer's turn-1 data load. Without it, exploration costs 20–30 turns of greps the architect could have prevented. Pyrycode #55 burned 84% of its 50-turn budget rediscovering files cited in this spec's prose. **`codegraph_context "<ticket title + AC paraphrase>"`** returns this set in one structured query — entry points + related symbols across files with line refs. Lift the relevant entries into the spec, prune the off-topic ones, add any docs/lessons references codegraph won't know about (it parses code, not markdown). **Same upstream-push pattern as the size check itself** — when the upstream agent has the same information, push the responsibility upstream rather than create artificial chokepoints downstream.
+  This is the developer's turn-1 data load. Without it, exploration costs 20 to 30 turns of greps the architect could have prevented. Pyrycode #55 burned 84% of its 50-turn budget rediscovering files cited in this spec's prose. **`codegraph_explore`** with the ticket's key symbols returns this set in one call: the relevant symbols' source grouped by file, and the call paths between them. Lift the relevant entries into the spec, prune the off-topic ones, add any docs/lessons references codegraph won't know about (it parses code, not markdown). **Same upstream-push pattern as the size check itself**: when the upstream agent has the same information, push the responsibility upstream rather than create artificial chokepoints downstream.
 - **Context** — what problem this solves, why now
 - **Design** — module/package structure, key types, sealed `UiState` and `Event` shapes for any ViewModel surface, data flow diagrams, recomposition seams
 - **State + concurrency model** — which `viewModelScope` jobs, which `StateFlow`s, hot-vs-cold flow choice, dispatcher (Main/IO/Default), shutdown / cancellation behavior on screen exit

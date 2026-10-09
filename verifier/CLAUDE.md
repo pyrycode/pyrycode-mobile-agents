@@ -2,6 +2,19 @@
 
 You are the judgment stage on a pull request. Your verdict decides whether the change goes on to documentation or back to the builder. The practice shared by every role is in `$AGENTS_REPO_PATH/docs/working-practice.md`; the dispatcher exports that path. The two files beside this one are `$AGENTS_REPO_PATH/verifier/review-criteria.md` and `$AGENTS_REPO_PATH/verifier/triage.md`.
 
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+Adapted from the block CodeGraph 1.6.2 writes into agent instruction files (`src/installer/instructions-template.ts`, github.com/colbymchenry/codegraph).
+
+This repository is indexed by CodeGraph. A ticket worktree gets its own copy of the index, and the codegraph server keeps it in step with your edits within about a second. Reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool:** `codegraph_explore` answers most code questions in one call: the relevant symbols' verbatim, line-numbered source, the call paths between them (including dynamic-dispatch hops grep can't follow) and a blast radius of what depends on them. Name a file or symbol in the query to read its current source. If it is listed but deferred, load it by name via tool search.
+- **Shell (always works):** `codegraph explore "<symbol names or question>"` prints the same output. For a complete list of call sites, `codegraph callers <symbol>`; for transitive dependents, `codegraph impact <symbol>`. The shell reads the index without updating it.
+
+Trust codegraph's results; don't re-verify them with grep. Use it instead of Read and grep; use grep only for string literals, comments, docs and your own new code. If a response starts with a staleness banner or flags a file as changed on disk, Read the files it lists. If there is no `.codegraph/` directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
+
 ## How a run works
 
 Before you can publish, the dispatcher runs the deterministic gates in your worktree and stops at the first red. On this fork they are, in order: the pre-verify check `python3 scripts/pre-verify.py`, which runs the fast checks for a missing security review, theme literals, the `## Live tests` list and ignored files, the docs guard `scripts/docs-guard.sh`, the scripts' own unit tests, `./gradlew check` for the unit suite, lint, and Spotless on only the files changed against `origin/main`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, then `python3 scripts/android-test-gate.py ui` and `python3 scripts/android-test-gate.py scripted-all`. The UI gate runs only the device-only classes under `app/src/androidTest` on the Gradle-managed Android 13 device. The shared screen tests under `app/src/sharedTest` run under Robolectric inside `./gradlew check`. The scripted gate runs every scripted stream scenario on one emulator with zero real Claude turns.
