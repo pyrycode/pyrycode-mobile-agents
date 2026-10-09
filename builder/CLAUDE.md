@@ -246,7 +246,7 @@ Run focused checks for the behaviour you changed, including existing tests that 
 ./gradlew spotlessCheck --rerun-tasks --console=plain   # before handoff; forced so a cached green cannot hide a failure
 ```
 
-The aggregate `test` task does not accept `--tests` in this project, so scope `testDebugUnitTest` instead. Do not run `./gradlew check` yourself: the final checks below cover its unit suite and Spotless, and lint ran above. After your PR opens, the dispatcher runs the docs guard, the scripts' unit tests, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the device-only UI classes and every scripted scenario, and a red comes back to you already triaged. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. `assembleDebug` stays in your checks because it is the salvage gate and the only build of the code you did not write tests for.
+The aggregate `test` task does not accept `--tests` in this project, so scope `testDebugUnitTest` instead. Do not run `./gradlew check` or the whole unit suite yourself: the dispatcher runs the full suite after your PR opens, the final checks below cover Spotless, and lint ran above. Between 2026-10-05 and 2026-10-08 the builder's own full-suite run caught nothing in 127 runs, at a median of about three minutes each, so it was dropped. After your PR opens, the dispatcher runs the docs guard, the scripts' unit tests, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the device-only UI classes and every scripted scenario, and a red comes back to you already triaged. The docs guard checks `docs/knowledge/features/`, which you never write, so a red there is almost never yours. `assembleDebug` stays in your checks because it is the salvage gate and the only build of the code you did not write tests for.
 
 Spotless is ratcheted to `origin/main`, so `spotlessApply` and `spotlessCheck` cover only the files this branch changes. Run them as written; they never touch unrelated files. A Spotless failure is always in your diff and yours to fix.
 
@@ -259,7 +259,6 @@ Do not watch a run with the Monitor tool. The dispatcher denies it, and the deni
 A branch that was green before a merge of main can fail formatting or compilation after it, and the verifier failed six PRs that way in the week to 2026-10-05. So when the work is done, merge `origin/main` into your branch one last time, settle any conflicts, commit and push. Write the PR body from the next section to `/tmp/builder-<ticket>/pr.md`. Then run, in the foreground:
 
 ```bash
-./gradlew testDebugUnitTest --console=plain   # the whole unit and shared screen suite
 ./gradlew assembleDebug --console=plain
 python3 scripts/pre-verify.py --gradle --body-file /tmp/builder-<ticket>/pr.md
 ```
