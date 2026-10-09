@@ -113,3 +113,21 @@ Review overlap supports Claude and Codex. Claude preliminary review has only
 file-reading tools and receives the full diff from the dispatcher. Both phases
 share the existing time and turn budgets. Keep the current dispatcher running
 during this rollout. The new runtime loads on its next launch.
+
+## Mobile pipeline tools
+
+`scripts/pre-verify.py`, `scripts/android-test-gate.py`, `scripts/docs-guard.sh` and
+`scripts/design-compare.py` live here with their tests.
+Product scenario runners, device test sources and captured product fixtures stay in Mobile.
+The product's existing script paths delegate here.
+Set `AGENTS_REPO_PATH` for a non-sibling installation.
+Deploy this agents change before the matching product change.
+
+`PYRY_MOBILE_REPO` selects the product checkout for a direct invocation.
+Without it, tools use the sibling `../pyrycode-mobile` checkout.
+Run `bin/test-mobile-tools /path/to/pyrycode-mobile` to verify these tools explicitly.
+These tests include real local lock and subprocess fixtures and stay outside the product gate.
+
+`bin/pyry-test --slow` includes full-duration dispatcher timeout and wait-credit proofs.
+The product's full-cap disk retention proofs use `./gradlew test -PfullRetentionTests=true`.
+Run that tier after changing cache retention, saved history position or trimming policy.
