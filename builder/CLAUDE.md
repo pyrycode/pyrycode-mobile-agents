@@ -78,13 +78,26 @@ Never apply a `done:*` label yourself on any path. The dispatcher owns those.
 
 Under Codex, the shared practice's approved pipeline helpers take precedence over the raw `git` and `gh` write commands in these files, for pushing, PRs, comments, labels, board moves and blocker links.
 
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+Adapted from the block CodeGraph 1.6.2 writes into agent instruction files (`src/installer/instructions-template.ts`, github.com/colbymchenry/codegraph).
+
+This repository is indexed by CodeGraph. A ticket worktree gets its own copy of the index, and the codegraph server keeps it in step with your edits within about a second. Reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool:** `codegraph_explore` answers most code questions in one call: the relevant symbols' verbatim, line-numbered source, the call paths between them (including dynamic-dispatch hops grep can't follow) and a blast radius of what depends on them. Name a file or symbol in the query to read its current source. If it is listed but deferred, load it by name via tool search.
+- **Shell (always works):** `codegraph explore "<symbol names or question>"` prints the same output. For a complete list of call sites, `codegraph callers <symbol>`; for transitive dependents, `codegraph impact <symbol>`. The shell reads the index without updating it.
+
+Trust codegraph's results; don't re-verify them with grep. Use it instead of Read and grep; use grep only for string literals, comments, docs and your own new code. If a response starts with a staleness banner or flags a file as changed on disk, Read the files it lists. If there is no `.codegraph/` directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
+
 ## Phase A: plan
 
 ### Ground yourself
 
 Start from the issue: its acceptance criteria, the refiner's `Estimate:` line at the bottom, its `## Effort assessment`, any `## Figma` and `## Documentation handoff` sections, and its labels. Then read `docs/knowledge/INDEX.md`, and the feature overview under `docs/knowledge/features/` for each area you will touch, because that is where earlier tickets' lessons live. Overviews are named per feature and component, such as `thread-screen.md` or `status-sheet.md`, so list the directory once. If the ticket touches the wire, the protocol document at `../pyrycode/docs/protocol-mobile.md` in the sibling checkout is the single source of truth for frames; cite it rather than restating it. When the area is unfamiliar and those leave a gap, search QMD in `pyrycode-mobile-docs`, then `pyrycode-docs`.
 
-Use codegraph for symbol questions. The dispatcher links its index into your worktree. `codegraph_context` with the ticket title and acceptance criteria maps the code surface and seeds the plan's reading list. `codegraph_impact` gives call sites and transitive dependents for the fan-out check. Before you change a signature, remove a declaration or rename a type or composable, `codegraph_callers` lists every call site to update; a missed one costs a slow Gradle compile cycle. `codegraph_search` finds existing patterns to mirror. Fall back to grep for comments, string literals, JUnit backtick test names, Compose `testTag` values, docs, and your own edits, which the index does not see. Under Codex, if codegraph is not available, use repository search.
+Use codegraph for symbol questions (see CodeGraph above). `codegraph_explore` with the ticket's key symbols or a question about the area maps the code surface and seeds the plan's reading list. Naming a symbol gives its blast radius, callers per file and the tests that cover it, for the fan-out check; `codegraph impact <symbol>` in the shell adds transitive dependents. Before you change a signature, remove a declaration or rename a type or composable, `codegraph callers <symbol>` lists every call site to update; a missed one costs a slow Gradle compile cycle. Once a symbol is renamed or removed, the index no longer has its old name, so search for the old name as text to catch a leftover caller. Naming similar symbols in `codegraph_explore` finds existing patterns to mirror. Use grep only for comments, string literals, JUnit backtick test names, Compose `testTag` values, docs, and your own new code. If the MCP tool is missing, use the shell form from the block above.
 
 If a cold reader could not turn the acceptance criteria into tests, or context is missing that the repository cannot supply, route the ticket back for refinement as the table above says, naming exactly what is missing.
 
@@ -108,7 +121,7 @@ Resource XML counts toward written lines.
 
 Count total written work, not production lines. Tests are most of it, and each test is its own edit-and-debug cycle. On 2026-05-16 three upstream plans sized by production lines came in at 541, 596 and 1071 lines and all needed salvage, which is why the table counts everything and carries a reject-branch line. Refiner estimates have run 1.4 to 3 times below the measured size.
 
-For refactor-shaped work, such as a changed `data class`, interface, sealed member or function signature, a replaced widely used type, a cross-package import flip, or a new parameter on a widely called composable, count consumer call sites with `codegraph_impact`. Above ten, split. The Strangler Fig shape, new alongside old, then migrate, then remove, usually slices into two or three children.
+For refactor-shaped work, such as a changed `data class`, interface, sealed member or function signature, a replaced widely used type, a cross-package import flip, or a new parameter on a widely called composable, count consumer call sites with `codegraph callers <symbol>`, and `codegraph impact <symbol>` for transitive dependents. Above ten, split. The Strangler Fig shape, new alongside old, then migrate, then remove, usually slices into two or three children.
 
 Before trusting a forecast, check the evidence it rests on. Read a merged blocker's code and its production call sites, because the blocker can leave one caller unwired or already have done part of this ticket. For a type change, count constructors, narrow interfaces and test doubles, and compare the nearest shipped change of the same kind, counting inserted and deleted lines separately. Check which repository owns each acceptance criterion; a fix that belongs to a sibling repository goes to its owner. A compile constraint can set split order, such as freeing consumers before deleting shared state.
 
@@ -157,7 +170,7 @@ A plan longer than the diff it describes is the wrong plan. On Desktop #1063, an
 
 Otherwise write the full plan:
 
-- `## Files read`: the reading list behind the design, as paths with the symbols that matter and one line each on why. Seed it from `codegraph_context`. When a feature overview holds a lesson that changes how to build this ticket, name it here; a lesson reaches a rework leg only if the plan carries it.
+- `## Files read`: the reading list behind the design, as paths with the symbols that matter and one line each on why. Seed it from `codegraph_explore`. When a feature overview holds a lesson that changes how to build this ticket, name it here; a lesson reaches a rework leg only if the plan carries it.
 - `## Design source`: on UI-visible work.
 - `## Context`: the problem and why now. Say here if the work deserves a decision record.
 - `## Design`: package structure, key types, the sealed `UiState` and `Event` shapes for any ViewModel, data flow and recomposition seams.

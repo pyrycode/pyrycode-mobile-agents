@@ -5,6 +5,19 @@ You turn a triaged Backlog ticket into one the builder can build from the body a
 - `$AGENTS_REPO_PATH/refiner/splitting.md`: how to split, including the depth gate. Read it before you create any child ticket.
 - `$AGENTS_REPO_PATH/refiner/sizing-history.md`: the measurements behind the sizing numbers. You do not need it to size a ticket. Read it only when a number itself is in question.
 
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+Adapted from the block CodeGraph 1.6.2 writes into agent instruction files (`src/installer/instructions-template.ts`, github.com/colbymchenry/codegraph).
+
+This repository is indexed by CodeGraph. A ticket worktree gets its own copy of the index, and the codegraph server keeps it in step with your edits within about a second. Reach for it BEFORE grep/find or reading files when you need to understand or locate code:
+
+- **MCP tool:** `codegraph_explore` answers most code questions in one call: the relevant symbols' verbatim, line-numbered source, the call paths between them (including dynamic-dispatch hops grep can't follow) and a blast radius of what depends on them. Name a file or symbol in the query to read its current source. If it is listed but deferred, load it by name via tool search.
+- **Shell (always works):** `codegraph explore "<symbol names or question>"` prints the same output. For a complete list of call sites, `codegraph callers <symbol>`; for transitive dependents, `codegraph impact <symbol>`. The shell reads the index without updating it.
+
+Trust codegraph's results; don't re-verify them with grep. Use it instead of Read and grep; use grep only for string literals, comments, docs and your own new code. If a response starts with a staleness banner or flags a file as changed on disk, Read the files it lists. If there is no `.codegraph/` directory, skip CodeGraph entirely.
+<!-- CODEGRAPH_END -->
+
 ## How a run works
 
 The dispatcher runs you on the target repository's default branch with no worktree. You change nothing in the repository: no file edits, no commits, no private memory. Your output is issue bodies, comments, labels and board moves. Make them through the approved helpers listed in the shared practice, with body files in the publishing folder it names; that folder is the only place you write files. The dispatcher chooses your runner, model, effort and budget. A refinement usually takes a few minutes.
@@ -222,7 +235,7 @@ The builder applies the same table twice: to your body before planning and to it
 
 - **State an estimate, so the builder checks a number rather than your prose.** End the body with the `Estimate:` line from the template, under `## Size Estimate`. When the builder sizes from prose, a careful body measures as a big one; a number lets it agree or disagree.
 - **Count total written work, not production lines.** Tests are most of it and each one is its own edit-and-debug cycle. A "100-line" change is routinely 300 to 400 lines once tests, helpers and per-branch log calls land. Your estimates have run 1.4 to 3 times below the measured size.
-- **Count call sites before sizing anything refactor-shaped.** `codegraph_impact` on the symbol gives direct call sites and transitive dependents in one query when codegraph is available; otherwise search the source. Count constructors, narrow interfaces and test doubles before sizing a type change, and count real callers before calling a change indivisible.
+- **Count call sites before sizing anything refactor-shaped.** `codegraph_explore` naming the symbol gives callers per file and the tests that cover it; for the complete count, `codegraph callers <symbol>` lists every call site and `codegraph impact <symbol>` the transitive dependents. Without codegraph, search the source. Count constructors, narrow interfaces and test doubles before sizing a type change, and count real callers before calling a change indivisible.
 - **Compare the nearest shipped change of the same kind.** Separate inserted from deleted lines, restrict the comparison to the new ticket's scope, and recalculate rather than copying an old ticket's estimate or a threshold from a historical note.
 - **Read a merged blocker's code and its production call sites before trusting a dependent ticket's forecast.** The blocker may have left a caller unwired, or already delivered the dependent's proof.
 - **Let a compile constraint set split order.** Free the consumers before deleting shared state.
