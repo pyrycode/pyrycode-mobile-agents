@@ -72,12 +72,12 @@ When `CLAUDE.md`'s rule on bugs outside the ticket applies:
    project_id=$(gh project view 5 --owner pyrycode --format json --jq '.id')
    field_json=$(gh project field-list 5 --owner pyrycode --format json)
    status_field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name == "Status") | .id')
-   inbox_option_id=$(echo "$field_json" | jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "Inbox") | .id')
+   backlog_option_id=$(echo "$field_json" | jq -r '.fields[] | select(.name == "Status") | .options[] | select(.name == "Backlog") | .id')
    gh project item-edit --project-id "$project_id" --id "$item_id" \
-     --field-id "$status_field_id" --single-select-option-id "$inbox_option_id"
+     --field-id "$status_field_id" --single-select-option-id "$backlog_option_id"
    ```
 
-   Resolve the field and option ids at runtime, because field updates reissue them. `gh project item-add` does not set a Status on its own. Under Codex, use the helper's `issue-create`, `board-add` and `board-status ISSUE "Inbox"`. Inbox is for human triage, and the operator promotes the bug when it is ready.
+   Resolve the field and option ids at runtime, because field updates reissue them. `gh project item-add` does not set a Status on its own. Under Codex, use the helper's `issue-create`, `board-add` and `board-status ISSUE "Backlog"`. Actionable bugs go to Backlog for refinement without human promotion. Use Inbox only when the ticket needs a specific decision or missing input from the operator, and comment with that need. An unknown technical cause is investigation work for Backlog.
 3. Commit the test, push and open the PR as usual. The PR names the ignored assertion and links the bug ticket.
 
 If even the failing test cannot be written without the bug fix, which is rare, route the ticket back for refinement with a one-line explanation, so the refiner can sequence the bug ticket as a blocker.
