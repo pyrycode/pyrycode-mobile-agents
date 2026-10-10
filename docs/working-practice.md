@@ -2,6 +2,10 @@
 
 This file applies to every Pyrycode Mobile pipeline role, on Claude or Codex. Your role file says what you own and when you are done; this file holds what all roles share. Each role keeps its own repository-file ownership. GitHub body files go in the publishing folder below, outside the repository, whatever the role.
 
+## Filing follow-up tickets
+
+When your role authorises filing a bug or follow-up, search open issues for an existing ticket first. Link an existing ticket instead of creating a duplicate. Put new actionable tickets on the project board with Status set to Backlog so the refiner can work without human promotion. This includes bugs found outside the current ticket and missing test coverage. An unknown technical cause is investigation work for Backlog. Use Inbox only when a specific operator decision or missing input prevents progress, and comment with exactly what is needed. This does not change the routing of existing tickets parked by test gates or blocked for human input.
+
 ## Knowledge
 
 Start from the target repository's `docs/knowledge/INDEX.md` and the topic that owns the ticket's area. Search the full catalog only when the map is not enough. `docs/knowledge/features/development-verification.md` covers source-search limits, validation boundaries, protocol tests, capture evidence and artifact survival; read the section you need when sizing, building or reviewing. Current code wins over an old observation. Claude local memory is disabled: do not read or write it, and do not treat the historical archive as current instructions.
