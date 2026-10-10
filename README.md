@@ -131,3 +131,13 @@ These tests include real local lock and subprocess fixtures and stay outside the
 `bin/pyry-test --slow` includes full-duration dispatcher timeout and wait-credit proofs.
 The product's full-cap disk retention proofs use `./gradlew test -PfullRetentionTests=true`.
 Run that tier after changing cache retention, saved history position or trimming policy.
+
+## Shared machine capacity
+
+Use `bin/pyry-start --managed` after configuring the machine manager. The flag also works with `bin/pyry-restart` and survives Ctrl-R. Missing manager credentials stop startup instead of falling back to independent dispatch.
+
+Set `PYRY_MANAGER_URL`, `PYRY_MANAGER_TOKEN` and the role resource classes in the existing secret environment. Build agents default to medium, refinement and documentation agents to light, and other roles to heavy. Documentation remains limited to one running agent per board across computers. Keep `PYRY_AUTOCURATE_MEMORY=0`. The manager applies a heavy limit and a combined heavy-plus-medium limit across this computer's projects. Light agents consume neither limit. Ticket ownership persists across computers until manually freed.
+
+See the shared [setup and recovery guide](dispatcher/docs/machine-manager.md). Drain old dispatchers and disable independent watcher takeover before sharing a board. The examples contain the approved starting limits. Project order, paths and credentials still need local configuration.
+
+Managed startup leaves the formatting check to the admitted builder and verifier jobs. It does not run Gradle before receiving capacity.
