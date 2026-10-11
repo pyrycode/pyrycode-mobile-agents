@@ -88,6 +88,8 @@ def hand_run_login(env, parent):
 def live_claude_environment(parent):
     """Reuse the loaded login, strip account credentials from test children."""
     env = {key: value for key, value in parent.items() if not key.startswith("OP_") and key not in {"PYRY_DEV_AGENTS_TOKEN", "PYRY_LIVE_CLAUDE_TOKEN"}}
+    # Live checks exercise app behaviour, independently of the operator's coding model.
+    env.update(ANTHROPIC_MODEL="haiku", CLAUDE_CODE_SUBAGENT_MODEL="haiku")
     if parent.get("PYRY_LIVE_CLAUDE_TOKEN", "").strip():
         env["CLAUDE_CODE_OAUTH_TOKEN"] = parent["PYRY_LIVE_CLAUDE_TOKEN"]
     token = parent.get("OP_SERVICE_ACCOUNT_TOKEN")
