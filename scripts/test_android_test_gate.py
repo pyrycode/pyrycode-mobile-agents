@@ -36,6 +36,17 @@ def live_report(count):
 
 
 class DevAgentsAuthTest(unittest.TestCase):
+    def test_live_tests_use_haiku_instead_of_the_interactive_model(self):
+        parent = {"CLAUDE_CODE_OAUTH_TOKEN": "login-fixture", "ANTHROPIC_MODEL": "opus",
+                  "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"}
+        with patch.object(gate.subprocess, "run") as run:
+            child = gate.live_claude_environment(parent)
+        run.assert_not_called()
+        self.assertEqual(child["ANTHROPIC_MODEL"], "haiku")
+        self.assertEqual(child["CLAUDE_CODE_SUBAGENT_MODEL"], "haiku")
+        self.assertEqual(parent["ANTHROPIC_MODEL"], "opus")
+        self.assertEqual(parent["CLAUDE_CODE_SUBAGENT_MODEL"], "sonnet")
+
     def test_loaded_builder_login_needs_no_password_manager(self):
         with patch.object(gate.subprocess, "run", side_effect=AssertionError("must not fetch online")):
             child = gate.live_claude_environment({"PYRY_LIVE_CLAUDE_TOKEN": "loaded-login-fixture",
@@ -78,7 +89,8 @@ class DevAgentsAuthTest(unittest.TestCase):
 
     def test_no_account_leaves_interactive_login_available(self):
         with patch.object(gate.subprocess, "run") as run:
-            self.assertEqual(gate.live_claude_environment({"PATH": "/bin"}), {"PATH": "/bin"})
+            self.assertEqual(gate.live_claude_environment({"PATH": "/bin"}),
+                             {"PATH": "/bin", "ANTHROPIC_MODEL": "haiku", "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"})
         run.assert_not_called()
 
     def hand_run(self, parent, result):
