@@ -114,7 +114,7 @@ When a role runs device or scripted tests on this host:
 
 - Run from your worktree. `ANDROID_HOME` and `JAVA_HOME` come from the dispatcher's environment, and worktrees have no `local.properties`. If `ANDROID_HOME` is missing, set it to the installed SDK for the command.
 - Scripted scenarios build test binaries from the configured `PYRYCODE_SRC` and `PYRYCODE_RELAY_SRC` sibling sources, or use existing test-only binaries. Keep the harness's isolated test daemon identity, and never use or change the production daemon.
-- No Claude credential is needed, and none may be copied into an agent context.
+- Device and scripted tests need no Claude credential. Targeted live repairs use the builder-only login loaded at dispatcher startup through the live-test launcher. The launcher removes account credentials before starting tests and uses the restricted Dev agents account only if no loaded login exists. Other Codex roles receive neither credential. Never print credentials or the environment.
 - If the sandbox blocks device execution, use the normal approval mechanism. Do not bypass a rejection or change security settings to make a test run.
 - Keep the command's exit status and read fresh XML for the selected tests. An empty or entirely skipped run is unverified.
 
