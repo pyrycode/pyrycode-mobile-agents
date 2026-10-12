@@ -137,3 +137,19 @@ the Claude source review, as the child's stdin file descriptor. It was piped in
 after spawn, and a busy dispatcher could miss the Claude CLI's 3-second stdin
 window, as Mobile #1432's source review did right after a restart. No local
 setting is required.
+
+## Live device ownership and cold starts, 2026-10-12
+
+Live runs use a single cold boot when the managed AVD already exists. Saved emulator
+runtime state is not loaded or written. Failed cold startup does not trigger another
+attempt. The launcher retains the emulator log. First-time AVD creation still uses
+the managed-device setup path.
+
+The device lock covers boot, test execution and confirmed emulator shutdown. Test
+commands own a separate process group. Interrupt and termination signals allow the
+shell's fixture cleanup to finish before the lock is released. A second cancellation
+does not interrupt cleanup. Remaining owned processes are terminated before return.
+
+The live test class is also used by a device-only onboarding test. Changes to that
+class or its shared helpers therefore require the UI gate. They no longer qualify
+for the earlier live-only source exemption.
