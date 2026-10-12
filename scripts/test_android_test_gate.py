@@ -200,7 +200,7 @@ class AndroidGateTest(unittest.TestCase):
                             patch("sys.argv", ["android-test-gate.py", "live"]), \
                             patch.object(gate, "claude_authenticated", return_value=True), \
                             patch.object(gate.time, "time_ns", return_value=started), \
-                            patch.object(gate.subprocess, "run", side_effect=run), \
+                            patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
                             contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
                         self.assertEqual(gate.main(), 0 if result == "pass" else 1)
                     if result in ("missing", "stale"):
@@ -353,11 +353,11 @@ class AndroidGateTest(unittest.TestCase):
         e2e = "app/src/androidTest/java/de/pyryco/mobile/e2e/"
         live, deterministic, peer = [e2e + name + ".kt" for name in
                                      ("InteractiveStreamE2ETest", "DeterministicInteractiveStreamE2ETest", "SecondClientPeer")]
-        for paths in (["docs/knowledge/features/x.md"], ["README.md"], ["scripts/e2e-emulator.sh", live],
-                      ["scripts/android-test-gate.py", peer, deterministic], [e2e + "PeerIdentityLifecycleTest.kt"]):
+        for paths in (["docs/knowledge/features/x.md"], ["README.md"], ["scripts/e2e-emulator.sh", deterministic],
+                      ["scripts/android-test-gate.py", deterministic], [e2e + "PeerIdentityLifecycleTest.kt"]):
             with self.subTest(paths=paths):
                 self.assertTrue(gate.ui_suite_skippable(paths))
-        for paths in ([], None, ["app/src/main/java/de/pyryco/mobile/MainActivity.kt"], [e2e + "E2eTestApplication.kt"],
+        for paths in ([], None, [live], [peer], ["app/src/main/java/de/pyryco/mobile/MainActivity.kt"], [e2e + "E2eTestApplication.kt"],
                       [e2e + "E2eInstrumentationRunner.kt"],
                       ["app/src/sharedTest/java/de/pyryco/mobile/e2e/UnrecognizedRowSentinel.kt"],
                       ["app/src/sharedTest/java/de/pyryco/mobile/ui/conversations/thread/SessionBoundaryAssertions.kt"],
@@ -390,7 +390,7 @@ class AndroidGateTest(unittest.TestCase):
                 with patch.object(gate, "ROOT", Path(tmp)), patch.dict(os.environ, {**environment, "ANDROID_USER_HOME": tmp}, clear=True), \
                         patch("sys.argv", ["android-test-gate.py", "ui"]), \
                         patch.object(gate, "changed_paths", return_value=changed), \
-                        patch.object(gate.subprocess, "run", run), contextlib.redirect_stderr(io.StringIO()):
+                        patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), contextlib.redirect_stderr(io.StringIO()):
                     result = gate.main()
                 self.assertEqual(run.called, runs)
                 # #1071: a skipped run never takes the device hold.
@@ -410,7 +410,7 @@ class AndroidGateTest(unittest.TestCase):
         with patch.object(gate, "ROOT", root), patch.dict(os.environ, {**environment, "ANDROID_USER_HOME": str(root)}, clear=True), \
                 patch("sys.argv", ["android-test-gate.py", "ui"]), \
                 patch.object(gate, "changed_paths", return_value=["app/src/main/X.kt"]), \
-                patch.object(gate.subprocess, "run", run), contextlib.redirect_stderr(io.StringIO()):
+                patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), contextlib.redirect_stderr(io.StringIO()):
             result = gate.main()
         return result, run.call_args.args[0] if run.called else None
 
@@ -481,7 +481,7 @@ class AndroidGateTest(unittest.TestCase):
 
             stderr, stdout = io.StringIO(), io.StringIO()
             with patch.object(gate, "ROOT", root), patch.object(gate, "managed_avd", return_value=None), \
-                    patch.object(gate.subprocess, "run", run), patch.object(gate.signal, "signal"), \
+                    patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), patch.object(gate.signal, "signal"), \
                     contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
                 result = gate.run_scripted_all({"ANDROID_HOME": "/sdk"}, run_dir, "pixel2Api33Atd")
             # #1039: each scenario's logcat is kept under its own name before the next scenario runs.
@@ -523,7 +523,7 @@ class AndroidGateTest(unittest.TestCase):
                     patch.object(gate, "boot_emulator", return_value=("emulator-5600", None)), \
                     patch.object(gate, "install_once", return_value=["android.permission.CAMERA"]) as install, \
                     patch.object(gate, "reset_app", side_effect=reset), \
-                    patch.object(gate.subprocess, "run", run), patch.object(gate.signal, "signal"), \
+                    patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), patch.object(gate.signal, "signal"), \
                     contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                 result = gate.run_scripted_all({"ANDROID_HOME": "/sdk"}, run_dir, "pixel2Api33Atd")
         install.assert_called_once_with({"ANDROID_HOME": "/sdk"}, "emulator-5600")
@@ -557,7 +557,7 @@ class AndroidGateTest(unittest.TestCase):
             return subprocess.CompletedProcess(command, 0, dump if "dumpsys" in command else "", "")
 
         root = Path("/tree")
-        with patch.object(gate, "ROOT", root), patch.object(gate.subprocess, "run", run):
+        with patch.object(gate, "ROOT", root), patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run):
             granted = gate.install_once({"ANDROID_HOME": "/sdk"}, "emulator-5600")
         adb = ["/sdk/platform-tools/adb", "-s", "emulator-5600"]
         self.assertEqual(calls, [adb + ["install", "-r", "-t", "-g", str(root / gate.APKS[0])],
@@ -571,14 +571,14 @@ class AndroidGateTest(unittest.TestCase):
 
     def test_reset_app_clears_the_data_then_grants_back(self):
         run = Mock(return_value=subprocess.CompletedProcess([], 0))
-        with patch.object(gate.subprocess, "run", run):
+        with patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run):
             self.assertTrue(gate.reset_app({"ANDROID_HOME": "/sdk"}, "emulator-5600", ["p.A", "p.B"]))
         adb = ["/sdk/platform-tools/adb", "-s", "emulator-5600", "shell", "pm"]
         self.assertEqual([call.args[0] for call in run.call_args_list],
                          [adb + ["clear", "de.pyryco.mobile"], adb + ["grant", "de.pyryco.mobile", "p.A"],
                           adb + ["grant", "de.pyryco.mobile", "p.B"]])
         run = Mock(side_effect=subprocess.TimeoutExpired("adb", 300))
-        with patch.object(gate.subprocess, "run", run), contextlib.redirect_stderr(io.StringIO()):
+        with patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), contextlib.redirect_stderr(io.StringIO()):
             self.assertFalse(gate.reset_app({"ANDROID_HOME": "/sdk"}, "emulator-5600", ["p.A"]))
 
     def test_changed_paths_lists_branch_uncommitted_and_untracked_files(self):
@@ -640,7 +640,7 @@ class AndroidGateTest(unittest.TestCase):
                     patch("sys.argv", ["android-test-gate.py", "live", "--tests", method]), \
                     patch.object(gate, "claude_authenticated", return_value=True), \
                     patch.object(gate.time, "time_ns", return_value=started), \
-                    patch.object(gate.subprocess, "run", side_effect=run), \
+                    patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
                     contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(gate.main(), 0)
         self.assertEqual(seen["LIVE_TESTS"], method)
@@ -674,7 +674,7 @@ class AndroidGateTest(unittest.TestCase):
                         patch("sys.argv", ["android-test-gate.py", "live"]), \
                         patch.object(gate, "claude_authenticated", return_value=True), \
                         patch.object(gate.time, "time_ns", return_value=started), \
-                        patch.object(gate.subprocess, "run", side_effect=run), \
+                        patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
                         contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
                     self.assertEqual(gate.main(), 0 if report == "pass" else 1)
                 run_dir = next((root / "build/dispatcher-tests").glob("live-*"))
@@ -706,7 +706,7 @@ class AndroidGateTest(unittest.TestCase):
                 patch("sys.argv", ["android-test-gate.py", "ui"]), \
                 patch.object(gate, "changed_paths", return_value=["app/src/main/X.kt"]), \
                 patch.object(gate.time, "time_ns", return_value=started), \
-                patch.object(gate.subprocess, "run", side_effect=run), \
+                patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             result = gate.main()
         return result, stdout.getvalue(), stderr.getvalue()
@@ -1012,7 +1012,7 @@ class DeviceHoldTest(unittest.TestCase):
                 patch("sys.argv", ["android-test-gate.py", *argv]), \
                 patch.object(gate, "changed_paths", return_value=["app/src/main/X.kt"]), \
                 patch.object(gate, "claude_authenticated", return_value=True), \
-                patch.object(gate.signal, "signal"), patch.object(gate.subprocess, "run", side_effect=run), \
+                patch.object(gate.signal, "signal"), patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             result = gate.main()
         return result, seen, stdout.getvalue(), stderr.getvalue()
@@ -1042,6 +1042,15 @@ class DeviceHoldTest(unittest.TestCase):
                 self.assertTrue(self.envs)
                 self.assertTrue(all(env.get("E2E_DISABLE_ANIMATIONS") == expected for env in self.envs))
 
+    def test_managed_runs_do_not_leave_a_reusable_gradle_daemon(self):
+        for mode in (["ui"], ["scripted", "ping"], ["scripted-all"], ["live"]):
+            with self.subTest(mode=mode):
+                seen = []
+                self.build.side_effect = lambda env, _: seen.append(env.copy()) or 0
+                self.run_main(mode, {"GRADLE_OPTS": "-Dexample.keep=true -Dorg.gradle.daemon=true"})
+                for env in [*seen, *self.envs]:
+                    self.assertEqual(env["GRADLE_OPTS"], "-Dexample.keep=true -Dorg.gradle.daemon=true -Dorg.gradle.daemon=false")
+
     def test_a_failed_apk_build_never_takes_the_device(self):
         self.build.return_value = 3
         for argv in (["ui"], ["scripted-all"], ["live"]):
@@ -1060,7 +1069,7 @@ class DeviceHoldTest(unittest.TestCase):
                                  ("scripted-all", ["-PuseRelayRepository=true"]), ("live", ["-PuseRelayRepository=true"])):
             with self.subTest(mode=mode):
                 run = Mock(return_value=subprocess.CompletedProcess([], 4))
-                with patch.object(gate, "ROOT", root), patch.object(gate.subprocess, "run", run):
+                with patch.object(gate, "ROOT", root), patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run):
                     self.assertEqual(REAL_BUILD_APKS({"K": "v"}, mode), 4)
                 self.assertEqual(run.call_args.args[0], [str(root / "gradlew"), ":app:assembleDebug",
                                                          ":app:assembleDebugAndroidTest", *properties, "--console=plain"])
@@ -1087,6 +1096,49 @@ class DeviceHoldTest(unittest.TestCase):
         for value in ("soon", "-1", "nan", ""):
             with self.subTest(value=value), self.assertRaises(SystemExit):
                 self.run_main(["ui"], {"ANDROID_GATE_WAIT_SECONDS": value})
+
+
+
+
+class ColdLiveBootTest(unittest.TestCase):
+    def test_cold_boot_never_loads_saved_runtime_state(self):
+        process = Mock()
+        process.poll.return_value = None
+        with patch.object(gate, 'free_emulator_port', return_value=5600), \
+                patch.object(gate.subprocess, 'Popen', return_value=process) as start, \
+                patch.object(gate.subprocess, 'run', return_value=Mock(stdout='1\n')):
+            self.assertEqual(gate.boot_emulator({'ANDROID_HOME': '/sdk'}, Path('/avds'), 'test', cold=True),
+                             ('emulator-5600', process))
+        argv = start.call_args.args[0]
+        self.assertIn('-no-snapshot-load', argv)
+        self.assertIn('-no-snapshot-save', argv)
+        self.assertNotIn('-force-snapshot-load', argv)
+
+    def test_failed_cold_boot_is_not_retried(self):
+        process = Mock()
+        process.poll.return_value = 1
+        with patch.object(gate, 'free_emulator_port', return_value=5600), \
+                patch.object(gate.subprocess, 'Popen', return_value=process) as start, \
+                patch.object(gate, 'stop_emulator') as stop, patch.object(gate.signal, 'signal'):
+            self.assertEqual(gate.boot_emulator({'ANDROID_HOME': '/sdk'}, Path('/avds'), 'test', cold=True),
+                             (None, None))
+        start.assert_called_once()
+        stop.assert_called_once()
+
+    def test_live_cancellation_stops_owned_emulator_before_returning(self):
+        env = {'ANDROID_HOME': '/sdk'}
+        process = object()
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(gate, 'managed_avd', return_value=(Path('/avds'), 'test')), \
+                patch.object(gate, 'boot_emulator', return_value=('emulator-5600', process)) as boot, \
+                patch.object(gate, 'run_on_device', side_effect=KeyboardInterrupt) as run, \
+                patch.object(gate, 'stop_emulator') as stop, patch.object(gate.signal, 'signal'):
+            with self.assertRaises(KeyboardInterrupt):
+                gate.run_live_on_device(['test'], env, Path(tmp), 'pixel2Api33Atd', 2, 'Live')
+            self.assertTrue(boot.call_args.kwargs['cold'])
+            self.assertEqual(run.call_args.args[1]['ANDROID_SERIAL'], 'emulator-5600')
+            self.assertEqual(run.call_args.args[3], 'connected')
+            stop.assert_called_once_with(env, 'emulator-5600', process)
 
 
 if __name__ == "__main__":
