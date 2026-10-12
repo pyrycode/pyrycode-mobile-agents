@@ -54,6 +54,8 @@ A device run proves only what actually executed. After a run, read the fresh XML
 
 After a repair, rerun the failing method or scenario, then the whole affected class if the repair changed shared test setup. Record in the PR's Testing section the command, its exit status, the executed and passed counts and the evidence path. If setup or permissions block execution, report the concrete blocker and name the check that stayed unverified.
 
+Private evidence must survive both worktree cleanup and a container restart. Before returning a completed or waiting outcome, copy the raw XML, phone logs, required isolated-daemon diagnostics and a hash manifest into `$AGENTS_REPO_PATH/logs/evidence/<issue>/<run>/`. This directory is on the persistent agents volume. Create private directories and owner-only files, verify the copies and cite that destination in the handoff. Keep raw captures out of Git and publish only checked content-free summaries. If evidence is missing, name it. Container `/tmp` paths and the worktree's build directory alone are not durable evidence. Mobile #2101 lost its temporary daemon capture when a normal dispatcher update recreated the container on 2026-10-12.
+
 ## The real-Claude harness
 
 The ladder doc `docs/e2e-interactive-stream.md` in the product repo is the source of truth for the rung vocabulary and the harness seams. Read it before adding a scenario, and cite it rather than restating it.
