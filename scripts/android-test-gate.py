@@ -671,6 +671,9 @@ def main():
     run_dir = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=artifacts))
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
+    # A managed gate owns the build worker's lifetime as well as its test fixtures.
+    # Preserve operator JVM options while overriding any reusable-daemon preference.
+    env["GRADLE_OPTS"] = (env.get("GRADLE_OPTS", "") + " -Dorg.gradle.daemon=false").strip()
     env["PYRY_FORCE_TEST_RUN"] = "1"
     # Each invocation owns a test daemon identity, never the user's running daemon.
     identity = "e2e-auto-" + uuid.uuid4().hex[:8]

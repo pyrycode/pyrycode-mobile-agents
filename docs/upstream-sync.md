@@ -148,7 +148,10 @@ the managed-device setup path.
 The device lock covers boot, test execution and confirmed emulator shutdown. Test
 commands own a separate process group. Interrupt and termination signals allow the
 shell's fixture cleanup to finish before the lock is released. A second cancellation
-does not interrupt cleanup. Remaining owned processes are terminated before return.
+does not interrupt cleanup. Remaining members of the test command group are terminated
+before return. Managed gates disable reusable Gradle daemons while preserving other
+operator JVM options. Gradle's single-use worker exits after its build finishes or is
+cancelled; it is not kept as an idle worker between gates.
 
 The live test class is also used by a device-only onboarding test. Changes to that
 class or its shared helpers therefore require the UI gate. They no longer qualify

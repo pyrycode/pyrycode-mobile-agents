@@ -1042,6 +1042,15 @@ class DeviceHoldTest(unittest.TestCase):
                 self.assertTrue(self.envs)
                 self.assertTrue(all(env.get("E2E_DISABLE_ANIMATIONS") == expected for env in self.envs))
 
+    def test_managed_runs_do_not_leave_a_reusable_gradle_daemon(self):
+        for mode in (["ui"], ["scripted", "ping"], ["scripted-all"], ["live"]):
+            with self.subTest(mode=mode):
+                seen = []
+                self.build.side_effect = lambda env, _: seen.append(env.copy()) or 0
+                self.run_main(mode, {"GRADLE_OPTS": "-Dexample.keep=true -Dorg.gradle.daemon=true"})
+                for env in [*seen, *self.envs]:
+                    self.assertEqual(env["GRADLE_OPTS"], "-Dexample.keep=true -Dorg.gradle.daemon=true -Dorg.gradle.daemon=false")
+
     def test_a_failed_apk_build_never_takes_the_device(self):
         self.build.return_value = 3
         for argv in (["ui"], ["scripted-all"], ["live"]):
