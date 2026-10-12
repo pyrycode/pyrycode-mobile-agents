@@ -219,8 +219,7 @@ def combine_reports(paths, expected_class=None):
 # device test. Only the explicitly listed e2e-only sources are safe to change without re-running it;
 # a guard test keeps that true, including the peer's graph-lifecycle regression.
 E2E_ONLY_SOURCES = tuple(f"app/src/androidTest/java/de/pyryco/mobile/e2e/{name}.kt" for name in
-                         ("InteractiveStreamE2ETest", "DeterministicInteractiveStreamE2ETest", "SecondClientPeer", "SessionErrorRecoveryScenario",
-                          "PeerIdentityLifecycleTest"))
+                         ("DeterministicInteractiveStreamE2ETest", "PeerIdentityLifecycleTest"))
 
 
 def ui_suite_skippable(paths):
@@ -344,11 +343,11 @@ def uninterrupted_cleanup():
             signal.signal(sig, handler)
 
 
-def boot_emulator(env, avd_home, avd, timeout=180):
+def boot_emulator(env, avd_home, avd, timeout=180, *, cold=False, log=None):
     """Boot the AVD headless on a free port; returns (serial, process) or (None, None)."""
     adb = str(Path(env["ANDROID_HOME"]) / "platform-tools" / "adb")
     emulator = str(Path(env["ANDROID_HOME"]) / "emulator" / "emulator")
-    for _ in range(3):
+    for _ in range(1 if cold else 3):
         port = free_emulator_port()
         if port is None:
             return None, None
@@ -358,8 +357,8 @@ def boot_emulator(env, avd_home, avd, timeout=180):
             # The flags Gradle's managed device uses (emu-launch-params.txt), plus a fixed port.
             process = subprocess.Popen(
                 [emulator, f"@{avd}", "-no-window", "-no-boot-anim", "-no-audio", "-gpu", "auto-no-window",
-                 "-force-snapshot-load", "-read-only", "-no-snapshot-save", "-port", str(port)],
-                env={**env, "ANDROID_AVD_HOME": str(avd_home)}, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                 "-no-snapshot-load" if cold else "-force-snapshot-load", "-read-only", "-no-snapshot-save", "-port", str(port)],
+                env={**env, "ANDROID_AVD_HOME": str(avd_home)}, stdout=log or subprocess.DEVNULL, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline and process.poll() is None:
                 booted = subprocess.run([adb, "-s", serial, "shell", "getprop", "sys.boot_completed"],
@@ -600,7 +599,7 @@ def run_scripted_all(env, run_dir, device):
                       file=sys.stderr)
                 granted = None
             started = time.time_ns()
-            outcome = subprocess.run(["bash", str(ROOT / "scripts" / "e2e-emulator.sh")], cwd=ROOT,
+            outcome = run_device_command(["bash", str(ROOT / "scripts" / "e2e-emulator.sh")], cwd=ROOT,
                                      env=scenario_env, stdout=sys.stderr, stderr=sys.stderr)
             paths = fresh_reports(directory, started)
             logcats = fresh_logcats(directory, started)
@@ -761,16 +760,74 @@ def main():
             print(f"Android gate: {args.mode} {args.scenario or ''}; artifacts: {run_dir}", file=sys.stderr)
             if args.mode == "scripted-all":
                 return run_scripted_all(env, run_dir, device)
-            return run_on_device(command, env, run_dir, device, minimum, expected_class)
+            run = run_live_on_device if args.mode == "live" else run_on_device
+            return run(command, env, run_dir, device, minimum, expected_class)
     except DeviceBusy as busy:
         print(f"Android gate: device busy, not a test result: {busy}", file=sys.stderr)
         return DEVICE_BUSY_EXIT
 
 
+def run_live_on_device(command, env, run_dir, device, minimum, expected_class):
+    """Start live tests from a cold emulator instead of saved runtime state."""
+    avd = managed_avd(device) if env.get("ANDROID_HOME") else None
+    if avd is None:
+        return run_on_device(command, env, run_dir, device, minimum, expected_class)
+    serial = process = None
+    previous = {sig: signal.signal(sig, raise_interrupt) for sig in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        with (run_dir / "emulator.log").open("w") as log:
+            serial, process = boot_emulator(env, *avd, cold=True, log=log)
+        if serial is None:
+            print("Android gate: cold emulator boot failed; no live tests ran", file=sys.stderr)
+            return 1
+        return run_on_device(command, {**env, "DEVICE": "connected", "ANDROID_SERIAL": serial},
+                             run_dir, "connected", minimum, expected_class)
+    finally:
+        try:
+            stop_emulator(env, serial, process)
+        finally:
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+
+
+def run_device_command(command, **kwargs):
+    """Join the owned shell's cleanup before device custody can be released."""
+    previous = {sig: signal.signal(sig, raise_interrupt) for sig in (signal.SIGINT, signal.SIGTERM)}
+    process = None
+    try:
+        # Fixture children belong to this group, independently of the gate's caller.
+        process = subprocess.Popen(command, start_new_session=True, **kwargs)
+        return subprocess.CompletedProcess(command, process.wait())
+    finally:
+        try:
+            if process is not None:
+                with uninterrupted_cleanup():
+                    try:
+                        os.killpg(process.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        pass
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline:
+                        process.poll()
+                        try:
+                            os.killpg(process.pid, 0)
+                        except ProcessLookupError:
+                            break
+                        time.sleep(0.05)
+                    else:
+                        # The group is test-owned. A stuck fixture cannot outlive the gate.
+                        with contextlib.suppress(ProcessLookupError):
+                            os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+        finally:
+            for sig, handler in previous.items():
+                signal.signal(sig, handler)
+
+
 def run_on_device(command, env, run_dir, device, minimum, expected_class):
     started = time.time_ns()
     try:
-        outcome = subprocess.run(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr)
+        outcome = run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr)
         results = ROOT / "app/build/outputs/androidTest-results"
         directory = results / "connected/debug" if device == "connected" else results / "managedDevice/debug" / device
         paths = fresh_reports(directory, started)
