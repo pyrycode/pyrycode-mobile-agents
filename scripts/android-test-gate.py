@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import select
 from pathlib import Path
 import shutil
 import signal
@@ -415,10 +416,27 @@ def stop_emulator(env, serial, process):
 DEFAULT_DEVICE_WAIT_SECONDS = 300
 DEVICE_BUSY_EXIT = 75  # EX_TEMPFAIL: no test ran, so it is not a test result
 DEVICE_POLL_SECONDS = 0.25
+DEVICE_TERM_TIMEOUT = 10
+DEVICE_KILL_TIMEOUT = 3
+_DEVICE_HOLD_FD = None
+
+
+class CleanupUnconfirmed(RuntimeError):
+    def __init__(self, group, reason):
+        self.group, self.reason = group, reason
+        super().__init__(f"device cleanup unconfirmed: group={group}, reason={reason}")
 
 
 class DeviceBusy(Exception):
     pass
+
+
+def quarantine_device(error):
+    if _DEVICE_HOLD_FD is not None:
+        os.ftruncate(_DEVICE_HOLD_FD, 0)
+        os.pwrite(_DEVICE_HOLD_FD, json.dumps({"quarantine": True, "group": error.group,
+                                              "reason": error.reason}).encode(), 0)
+        os.fsync(_DEVICE_HOLD_FD)
 
 
 def device_hold_path():
@@ -505,6 +523,8 @@ def tickets_ahead(queue, ticket):
 @contextlib.contextmanager
 def device_hold(mode, wait):
     """Hold the host's managed device for the block, waiting up to [wait] seconds in arrival order; raises DeviceBusy."""
+    global _DEVICE_HOLD_FD
+    previous_fd = _DEVICE_HOLD_FD
     path = device_hold_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -538,12 +558,24 @@ def device_hold(mode, wait):
             drop_ticket(ticket_fd, ticket)
         if announced:
             print(f"Android gate: device free after {time.monotonic() - start:.0f}s waiting", file=sys.stderr)
+        try:
+            record = json.loads(os.pread(fd, 4096, 0) or b'{}')
+        except (ValueError, TypeError):
+            raise DeviceBusy("unreadable custody record; operator inspection required")
+        if record.get("quarantine"):
+            raise DeviceBusy("prior cleanup is unconfirmed; operator inspection required")
         started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         os.ftruncate(fd, 0)
         os.pwrite(fd, json.dumps({"mode": mode, "worktree": str(ROOT), "started": started,
                                   "pid": os.getpid()}).encode(), 0)
-        yield
+        _DEVICE_HOLD_FD = fd
+        try:
+            yield
+        except CleanupUnconfirmed as error:
+            quarantine_device(error)
+            raise
     finally:
+        _DEVICE_HOLD_FD = previous_fd
         os.close(fd)
 
 
@@ -599,13 +631,9 @@ def run_scripted_all(env, run_dir, device):
                       file=sys.stderr)
                 granted = None
             started = time.time_ns()
-            outcome = run_device_command(["bash", str(ROOT / "scripts" / "e2e-emulator.sh")], cwd=ROOT,
-                                     env=scenario_env, stdout=sys.stderr, stderr=sys.stderr)
-            paths = fresh_reports(directory, started)
-            logcats = fresh_logcats(directory, started)
-            for index, path in enumerate(logcats):
-                shutil.copy2(path, run_dir / f"{scenario}-{index}-{path.name}")
-            print_focus_records(logcats)
+            outcome, paths = run_with_reports(["bash", str(ROOT / "scripts" / "e2e-emulator.sh")],
+                                              scenario_env, directory, started, run_dir, f"{scenario}-")
+            all_paths.extend(paths)
             try:
                 _, passed, executed = combine_reports(paths, expected_class)
             except ValueError as error:
@@ -615,11 +643,6 @@ def run_scripted_all(env, run_dir, device):
             if not ok:
                 failed.append(scenario)
             print(f"Android gate: scripted {scenario}: {'pass' if ok else 'FAIL'}, {executed} executed", file=sys.stderr)
-            # Copied before the next scenario overwrites the same report file on the connected device.
-            for index, path in enumerate(paths):
-                copy = run_dir / f"{scenario}-{index}-{path.name}"
-                shutil.copy2(path, copy)
-                all_paths.append(copy)
     finally:
         stop_emulator(env, serial, process)
     try:
@@ -765,6 +788,9 @@ def main():
                 return run_scripted_all(env, run_dir, device)
             run = run_live_on_device if args.mode == "live" else run_on_device
             return run(command, env, run_dir, device, minimum, expected_class)
+    except CleanupUnconfirmed as error:
+        print(f"Android gate failed: {error}; device quarantined for inspection", file=sys.stderr)
+        return 1
     except DeviceBusy as busy:
         print(f"Android gate: device busy, not a test result: {busy}", file=sys.stderr)
         return DEVICE_BUSY_EXIT
@@ -793,54 +819,120 @@ def run_live_on_device(command, env, run_dir, device, minimum, expected_class):
                 signal.signal(sig, handler)
 
 
-def run_device_command(command, **kwargs):
-    """Join the owned shell's cleanup before device custody can be released."""
-    previous = {sig: signal.signal(sig, raise_interrupt) for sig in (signal.SIGINT, signal.SIGTERM)}
-    process = None
+def owned_group_members(group):
+    """Numeric process state only. Caller must keep the group owner unreaped."""
+    rows = subprocess.run(['/bin/ps', '-axo', 'pgid=,pid=,stat='],
+                          capture_output=True, text=True, timeout=2, check=True)
+    return [int(pid) for pgid, pid, state in (line.split() for line in rows.stdout.splitlines())
+            if int(pgid) == group and int(pid) != group and not state.startswith('Z')]
+
+
+def finish_device_group(owner):
+    """Never poll/reap owner here: its PID reserves this group's identity."""
     try:
-        # Fixture children belong to this group, independently of the gate's caller.
-        process = subprocess.Popen(command, start_new_session=True, **kwargs)
-        return subprocess.CompletedProcess(command, process.wait())
+        for sig, bound in ((signal.SIGTERM, DEVICE_TERM_TIMEOUT), (signal.SIGKILL, DEVICE_KILL_TIMEOUT)):
+            if not owned_group_members(owner.pid):
+                return
+            # A denied signal ends cleanup. Do not retry it through another path.
+            os.killpg(owner.pid, sig)
+            deadline = time.monotonic() + bound
+            while time.monotonic() < deadline:
+                if not owned_group_members(owner.pid):
+                    return
+                time.sleep(.05)
+        raise CleanupUnconfirmed(owner.pid, 'children-still-running')
+    except PermissionError as error:
+        raise CleanupUnconfirmed(owner.pid, 'permission-denied') from error
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        raise CleanupUnconfirmed(owner.pid, 'process-inspection-failed') from error
+
+
+def run_device_command(command, **kwargs):
+    """Pin process-group identity and retain device custody until verified exit."""
+    previous = {sig: signal.signal(sig, raise_interrupt) for sig in (signal.SIGINT, signal.SIGTERM)}
+    report_read, report_write = os.pipe()
+    release_read, release_write = os.pipe()
+    owner, ready = None, False
+    try:
+        inherited = tuple(kwargs.pop('pass_fds', ()))
+        custody = () if _DEVICE_HOLD_FD is None else (_DEVICE_HOLD_FD,)
+        owner = subprocess.Popen([sys.executable, str(Path(__file__).with_name('android-device-owner.py')),
+                                  str(report_write), str(release_read), ','.join(map(str, inherited)), *command],
+                                 pass_fds=(*inherited, *custody, report_write, release_read),
+                                 start_new_session=True, **kwargs)
+        os.close(report_write)
+        report_write = None
+        os.close(release_read)
+        release_read = None
+        if not select.select([report_read], [], [], 5)[0] or os.read(report_read, 1) != b'R':
+            raise CleanupUnconfirmed(owner.pid, 'owner-startup-unconfirmed')
+        ready = True
+        with os.fdopen(os.dup(report_read), 'rb') as result:
+            status = result.readline(32)
+        try:
+            code = int(status)
+        except ValueError as error:
+            raise CleanupUnconfirmed(owner.pid, 'owner-result-unavailable') from error
+        return subprocess.CompletedProcess(command, code)
     finally:
         try:
-            if process is not None:
+            if owner is not None:
                 with uninterrupted_cleanup():
+                    if not ready:
+                        if not select.select([report_read], [], [], 5)[0] or os.read(report_read, 1) != b'R':
+                            raise CleanupUnconfirmed(owner.pid, 'owner-startup-unconfirmed')
+                    finish_device_group(owner)
+                    # This is the first point at which the owner may be reaped.
+                    with contextlib.suppress(BrokenPipeError):
+                        os.write(release_write, b'R')
                     try:
-                        os.killpg(process.pid, signal.SIGTERM)
-                    except ProcessLookupError:
-                        pass
-                    deadline = time.monotonic() + 10
-                    while time.monotonic() < deadline:
-                        process.poll()
-                        try:
-                            os.killpg(process.pid, 0)
-                        except ProcessLookupError:
-                            break
-                        time.sleep(0.05)
-                    else:
-                        # The group is test-owned. A stuck fixture cannot outlive the gate.
-                        with contextlib.suppress(ProcessLookupError):
-                            os.killpg(process.pid, signal.SIGKILL)
-                    process.wait()
+                        owner.wait(timeout=3)
+                    except subprocess.TimeoutExpired as error:
+                        raise CleanupUnconfirmed(owner.pid, 'owner-exit-unconfirmed') from error
+        except CleanupUnconfirmed as error:
+            # Persist before caller cleanup/reporting can raise another exception.
+            quarantine_device(error)
+            raise
         finally:
+            for fd in (report_read, report_write, release_read, release_write):
+                if fd is not None:
+                    os.close(fd)
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
+
+
+def archive_device_reports(directory, started, run_dir, prefix):
+    paths = fresh_reports(directory, started)
+    logcats = fresh_logcats(directory, started)
+    copies = []
+    for index, path in enumerate(paths):
+        copy = run_dir / f'{prefix}{index}-{path.name}'
+        shutil.copy2(path, copy)
+        copies.append(copy)
+    for index, path in enumerate(logcats):
+        shutil.copy2(path, run_dir / f'{prefix}{index}-{path.name}')
+    print_focus_records(logcats)
+    return copies
+
+
+def run_with_reports(command, env, directory, started, run_dir, prefix):
+    try:
+        outcome = run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr)
+    except BaseException:
+        try:
+            archive_device_reports(directory, started, run_dir, prefix)
+        except Exception:
+            print('Android gate: report retention also failed; original failure preserved', file=sys.stderr)
+        raise
+    return outcome, archive_device_reports(directory, started, run_dir, prefix)
 
 
 def run_on_device(command, env, run_dir, device, minimum, expected_class):
     started = time.time_ns()
     try:
-        outcome = run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr)
         results = ROOT / "app/build/outputs/androidTest-results"
         directory = results / "connected/debug" if device == "connected" else results / "managedDevice/debug" / device
-        paths = fresh_reports(directory, started)
-        for index, path in enumerate(paths):
-            shutil.copy2(path, run_dir / f"{index}-{path.name}")
-        # Kept before the report is judged: a failing run is the one whose logcat someone needs to read.
-        logcats = fresh_logcats(directory, started)
-        for index, path in enumerate(logcats):
-            shutil.copy2(path, run_dir / f"{index}-{path.name}")
-        print_focus_records(logcats)
+        outcome, paths = run_with_reports(command, env, directory, started, run_dir, "")
         xml, passed, executed = combine_reports(paths, expected_class)
         (run_dir / "dispatcher.xml").write_text(xml + "\n")
         print(xml)
