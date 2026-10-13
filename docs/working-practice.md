@@ -120,6 +120,28 @@ When a role runs device or scripted tests on this host:
 
 ## Runner contract
 
+### Android cleanup custody
+
+The Android gate keeps a small owner process alive until its test process group
+has stopped. The owner also inherits the device lock. Numeric process-state
+inspection confirms exit without using a signal-zero permission probe. The owner
+is not reaped until cleanup finishes, preventing its process-group ID from being
+reused during signalling. Zombie-only groups cannot run more test work.
+
+A denied signal or uncertain process state fails the gate and quarantines the
+device. No alternate signal path retries a denied operation. Fresh XML and phone
+logs are retained even when cleanup fails. A later gate must not clear the
+quarantine. The operator must inspect the recorded group and confirm cleanup
+before clearing that record. Parent loss leaves the owner holding the device
+lock for recovery; it does not silently admit another test. Fixtures must remain
+in their owned process group. This does not supervise unrelated background build
+services or processes that deliberately leave that group.
+
+Credential-free regressions live in `scripts/test_android_cleanup_custody.py` and
+`scripts/test_android_gate_cancellation.py`. They require permission to inspect
+and signal their own synthetic processes. Run them outside a restrictive agent
+sandbox through normal approval. They need no emulator or live account.
+
 The runner chosen at launch sets the actual model and limits. Model names, turn counts and time budgets written in older role text do not override it. When Codex returns a structured outcome such as `needs_refinement` or `waiting_on_blocker`, the dispatcher publishes it and applies the routing labels, so do not repeat those mutations. The shared dispatcher README defines this contract.
 
 ## Git safety
