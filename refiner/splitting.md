@@ -26,6 +26,8 @@ Write every body as if the parent never existed: full scope, its own criteria, i
 
 ## Create and place the children
 
+Every board move, order change, blocker, label and close in a split changes orchestrator workflow through the managed GitHub bridge (see Workflow authority in `docs/working-practice.md`). Until the next publication cycle the GitHub board can show a new child in Inbox or at the end of its column. Confirm the column, labels and state by reading the child back with `gh issue view --repo pyrycode/pyrycode-mobile CHILD --json labels,state,projectItems`, which shows what the orchestrator holds, not by looking at the board. That read does not show blockers or order. Read blockers with `/Users/juhanailmoniemi/.codex/bin/pyrycode-mobile-pipeline-action relations CHILD`. No read confirms order: the position command succeeding is the confirmation, and the board shows it after publication. Read back before repeating a step that reported an error. On 2026-10-13 the bridge saved both children of Mobile #1984 in Backlog, in the right place, while every `board-status` call reported a failure. Sub-issue links and issue bodies stay on GitHub.
+
 1. Create each child with `H issue-create TITLE BODY_FILE`.
 2. Put each on the board in Backlog, not Inbox, since the parent was already triaged: `H board-add CHILD`, then `H board-status CHILD "Backlog"`. Adding an issue does not set its status, and an issue without one is invisible to every column query.
 3. Place the children directly after the parent, in dependency order: `H board-after FIRST PARENT`, then `H board-after NEXT PREVIOUS` for each later child. Children inherit the parent's priority this way. Do not use `top`, which jumps them ahead of tickets the parent was correctly behind.
