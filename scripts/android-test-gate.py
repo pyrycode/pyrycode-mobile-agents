@@ -689,8 +689,12 @@ def main():
     if args.mode == "ui" and os.environ.get("UI_GATE_FULL") != "1" and ui_suite_skippable(changed_paths()):
         print("Android gate: ui skipped; the branch changes only docs, scripts and e2e-only tests", file=sys.stderr)
         return 0
-    artifacts = ROOT / "build" / "dispatcher-tests"
-    artifacts.mkdir(parents=True, exist_ok=True)
+    # The dispatcher's live gate runs in a detached worktree it removes afterwards, so it names a folder
+    # outside it for this run's captures (agent-dispatcher gate-artifacts.ts). Anything else keeps the
+    # worktree's build folder, which an agent's own worktree retains.
+    gate_evidence = os.environ.get("PYRY_GATE_EVIDENCE_DIR", "").strip()
+    artifacts = Path(gate_evidence) if gate_evidence else ROOT / "build" / "dispatcher-tests"
+    artifacts.mkdir(parents=True, exist_ok=True, mode=0o700)
     run_dir = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=artifacts))
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)

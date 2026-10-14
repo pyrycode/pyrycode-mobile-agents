@@ -683,6 +683,43 @@ class AndroidGateTest(unittest.TestCase):
                 self.assertIn("end=peer_close code=1011", (run_dir / kept[0]).read_text())
                 self.assertNotIn("RelayLog", stdout.getvalue())
 
+    def test_dispatcher_evidence_folder_keeps_the_run_outside_the_worktree(self):
+        # Mobile #2137 and #1977: the dispatcher's live gate worktree is removed after the run, which took
+        # the XML, logcat and emulator log in build/dispatcher-tests with it. The dispatcher now names a folder.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "worktree"
+            evidence = Path(tmp) / "agents/logs/evidence/1977/gate-runs/2026-10-14T08-12-13-141Z/main"
+            directory = root / "app/build/outputs/androidTest-results/managedDevice/debug/pixel2Api33Atd"
+            started = 2_000_000_000
+            seen = {}
+            report = live_report(gate.LIVE_MINIMUM)
+
+            def run(command, **kwargs):
+                seen.update(kwargs["env"])
+                device = directory / "emulator-5554"
+                device.mkdir(parents=True)
+                path = self.report(directory, report)
+                logcat = device / f"logcat-{gate.LIVE_CLASS}-interactiveTurn_ping.txt"
+                logcat.write_text("I RelayLog: fresh\n")
+                for item in (path, logcat):
+                    os.utime(item, ns=(started + 1, started + 1))
+                return subprocess.CompletedProcess(command, 0)
+
+            with patch.object(gate, "ROOT", root), \
+                    patch.dict(os.environ, {"ANDROID_USER_HOME": tmp, "PYRY_GATE_EVIDENCE_DIR": str(evidence)}, clear=True), \
+                    patch("sys.argv", ["android-test-gate.py", "live"]), \
+                    patch.object(gate, "claude_authenticated", return_value=True), \
+                    patch.object(gate.time, "time_ns", return_value=started), \
+                    patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err := io.StringIO()):
+                self.assertEqual(gate.main(), 0, err.getvalue())
+            run_dir = next(evidence.glob("live-*"))
+            self.assertTrue((run_dir / "dispatcher.xml").is_file())
+            self.assertTrue((run_dir / "0-TEST-result.xml").is_file())
+            self.assertTrue((run_dir / f"0-logcat-{gate.LIVE_CLASS}-interactiveTurn_ping.txt").is_file())
+            self.assertFalse((root / "build/dispatcher-tests").exists(), "nothing left only in the worktree")
+            self.assertEqual(seen["PYRY_GATE_EVIDENCE_DIR"], str(evidence), "the harness sees the folder too")
+
     def ui_run_with_logcats(self, root, report_xml, logcats):
         """Drive `ui` through main() with a fake Gradle run writing [report_xml] and fresh or stale logcats."""
         self.device_test(root, "de/pyryco/mobile/ui/KeyboardTest.kt")
