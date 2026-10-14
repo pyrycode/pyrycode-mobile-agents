@@ -207,6 +207,10 @@ A plan committed after the code can be bent to match whatever got written. The v
 
 Your worktree is a fresh checkout with no `local.properties`. Gradle finds the Android SDK through `ANDROID_HOME` and the JDK through `JAVA_HOME`, both inherited from the dispatcher. If `./gradlew` fails with `SDK location not found` or `Unable to locate a Java Runtime`, name the missing variable and stop as for a missing tool. Do not write a `local.properties`: it would not reach the verifier's gate, which runs in its own worktree.
 
+### Edits and escalated commands
+
+Under Codex, make file edits with `apply_patch` as their own step, and run Gradle as a separate command when it needs `require_escalated`. Never put a file edit, an inline Python or shell rewrite included, in the same command as an escalated validation run. The automatic reviewer then judges the edit script as well, and it can misread one. On #2149 (2026-10-14) it rejected an additive test insert as discarding the file's later tests, and the run stopped with its implementation uncommitted.
+
 ### Tests first
 
 Write the failing test first and watch it fail for the right reason, then write the code that makes it pass.
