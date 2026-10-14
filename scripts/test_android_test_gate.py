@@ -720,6 +720,29 @@ class AndroidGateTest(unittest.TestCase):
             self.assertFalse((root / "build/dispatcher-tests").exists(), "nothing left only in the worktree")
             self.assertEqual(seen["PYRY_GATE_EVIDENCE_DIR"], str(evidence), "the harness sees the folder too")
 
+    def test_relative_evidence_folder_reaches_the_harness_as_an_absolute_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                seen = {}
+
+                def run(command, **kwargs):
+                    seen.update(kwargs["env"])
+                    return subprocess.CompletedProcess(command, 1)
+
+                with patch.object(gate, "ROOT", Path(tmp) / "worktree"), \
+                        patch.dict(os.environ, {"ANDROID_USER_HOME": tmp, "PYRY_GATE_EVIDENCE_DIR": "rel/main"}, clear=True), \
+                        patch("sys.argv", ["android-test-gate.py", "live"]), \
+                        patch.object(gate, "claude_authenticated", return_value=True), \
+                        patch.object(gate.subprocess, "run", side_effect=run), patch.object(gate, "run_device_command", side_effect=run), \
+                        contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                    gate.main()
+            finally:
+                os.chdir(cwd)
+            path = seen["PYRY_GATE_EVIDENCE_DIR"]
+            self.assertTrue(os.path.isabs(path) and path.endswith("/rel/main"), path)
+
     def ui_run_with_logcats(self, root, report_xml, logcats):
         """Drive `ui` through main() with a fake Gradle run writing [report_xml] and fresh or stale logcats."""
         self.device_test(root, "de/pyryco/mobile/ui/KeyboardTest.kt")

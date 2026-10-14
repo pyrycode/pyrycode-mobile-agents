@@ -693,10 +693,14 @@ def main():
     # outside it for this run's captures (agent-dispatcher gate-artifacts.ts). Anything else keeps the
     # worktree's build folder, which an agent's own worktree retains.
     gate_evidence = os.environ.get("PYRY_GATE_EVIDENCE_DIR", "").strip()
+    gate_evidence = os.path.abspath(gate_evidence) if gate_evidence else ""
     artifacts = Path(gate_evidence) if gate_evidence else ROOT / "build" / "dispatcher-tests"
     artifacts.mkdir(parents=True, exist_ok=True, mode=0o700)
     run_dir = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=artifacts))
     env = os.environ.copy()
+    if gate_evidence:
+        # The harness runs from the checkout, so it gets the same absolute folder.
+        env["PYRY_GATE_EVIDENCE_DIR"] = gate_evidence
     env.pop("ANTHROPIC_API_KEY", None)
     # A managed gate owns the build worker's lifetime as well as its test fixtures.
     # Preserve operator JVM options while overriding any reusable-daemon preference.
