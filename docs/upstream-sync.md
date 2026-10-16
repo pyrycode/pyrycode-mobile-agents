@@ -1,5 +1,14 @@
 # Mobile workflow sync
 
+## Captured client checks, 2026-10-16
+
+Mobile product PR 2195 promoted 71 captured scenarios into the normal device gate.
+Shared dispatcher revision `097d6c9` supports retiring both label parking and live
+execution. The launcher enforces `PYRY_REAL_CLAUDE_GATE_ENABLED=0` and clears the
+live command after saved settings load. Old saved settings cannot re-enable it.
+Explicit live requirements still need counted evidence before verifier PASS.
+Existing ticket holds, drains and missing evidence are not waived.
+
 ## Verifier throughput, 2026-09-30
 
 The launcher defaults to two concurrent agents and one verifier at a time.
@@ -25,10 +34,10 @@ Updated 2026-09-20 from the current Pyrycode and Desktop workflow.
   relevant scripted scenario while developing and repairing their changes.
   The commands and evidence requirements are in builder section B2.
 - Full UI and scripted tests are dispatcher-owned before verification. The
-  dispatcher uses `python3 scripts/android-test-gate.py ui` and one `scripted`
-  invocation for each supported scenario. A ticket carrying `needs-real-claude`
-  runs `python3 scripts/android-test-gate.py live` after verifier success and before
-  documentation or merge. Electron commands and Go gates do not apply.
+  dispatcher uses `python3 scripts/android-test-gate.py ui`, including captured
+  client scenarios, and `scripted-all`. Both use zero real Claude turns.
+  Automatic live routing is retired. Explicit live evidence must be supplied
+  before verifier PASS. Electron commands and Go gates do not apply.
 
 The product knowledge migration must land before these roles run. The short map is
 `docs/knowledge/INDEX.md`; the full catalogue remains searchable separately.
@@ -47,8 +56,7 @@ The cleanup fix in shared revision `386b296` preserves dirty worktrees and main-
 
 Durable lessons from the existing Mobile private-memory index were folded into the product verification topic and shared agent practice. Original memory files remain untouched as historical evidence.
 
-Shared revision `34ce97a` adds counted JUnit XML evidence. The Mobile environment
-uses it for the eight-test live suite. UI and all seven scripted scenarios run
+Shared revision `34ce97a` added counted JUnit XML evidence for the then eight-test live suite. UI and all seven scripted scenarios run
 before verifier. The wrapper builds test binaries from `PYRYCODE_SRC` and
 `PYRYCODE_RELAY_SRC` and uses Gradle's managed device. Claude authentication is
 checked before a live run. Missing credentials produce no passing report.

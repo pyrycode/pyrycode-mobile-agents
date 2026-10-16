@@ -239,9 +239,11 @@ trap "restore_tty; rm -f '$LOCK_FILE'" EXIT
 # dispatcher itself out of the terminal's group. Do not reintroduce a
 # process between `op run` and node.
 # Apply the explicit runner inside the existing exec wrapper, after op has
-# loaded .env. No extra process or shell quoting layer is introduced.
+# loaded .env. Retire both live execution and label parking after saved values
+# are injected. Requires dispatcher 097d6c9 or later. Recorded client tests run
+# in the normal UI gate. No extra process or quoting layer is introduced.
 "$AUTOMATION_ACCESS" op run --env-file="$AGENTS_DIR/.env" -- \
-  /usr/bin/perl -e 'delete $ENV{OP_SERVICE_ACCOUNT_TOKEN}; my $runner = shift @ARGV; my $managed = shift @ARGV; $ENV{PYRY_MANAGED} = 1 if length $managed; $ENV{PYRY_AGENT_RUNNER} = $runner if length $runner; setpgrp(0, 0) or die "setpgrp: $!\n"; open(STDIN, "<", "/dev/null"); exec @ARGV or die "exec: $!\n";' -- \
+  /usr/bin/perl -e 'delete $ENV{OP_SERVICE_ACCOUNT_TOKEN}; my $runner = shift @ARGV; my $managed = shift @ARGV; $ENV{PYRY_MANAGED} = 1 if length $managed; $ENV{PYRY_AGENT_RUNNER} = $runner if length $runner; $ENV{PYRY_REAL_CLAUDE_GATE_ENABLED} = "0"; $ENV{PYRY_REAL_CLAUDE_GATE_CMD} = ""; setpgrp(0, 0) or die "setpgrp: $!\n"; open(STDIN, "<", "/dev/null"); exec @ARGV or die "exec: $!\n";' -- \
   "$RUNNER_OVERRIDE" "$MANAGED_OVERRIDE" "$NODE_BIN" --import tsx src/dispatch-bin.ts "$@" &
 LAUNCH_PID=$!
 

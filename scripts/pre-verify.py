@@ -9,7 +9,7 @@ gate and the builder's last step before handoff. Each check mirrors one the veri
 - theme literals: no new `Color(0x`, `TextStyle(` or `RoundedCornerShape(` in changed main sources
   outside the theme package (the Material 3 tokens scan in the same file);
 - live tests: the pull request's `## Live tests` names only curated live methods, and every live
-  method the diff adds or changes, directly or through a helper (verifier/CLAUDE.md, "Live-Claude tests");
+  method the diff adds or changes, directly or through a helper, when explicit live selection is supplied;
 - operator files: the diff adds no file the repository ignores, such as `AGENTS.md`, which the
   dispatcher's automatic commit can pick up (#1439);
 - with --gradle only: origin/main is merged, then Spotless and every Kotlin compile pass. The dispatcher
@@ -332,10 +332,6 @@ def affected_live_methods(source, diff, live_methods):
     return sorted(name for name in affected if name in live_methods)
 
 
-def split_env_list(name):
-    return [part.strip() for part in os.environ.get(name, "").split(",") if part.strip()]
-
-
 def check_live_tests(report, base, body):
     name = "live tests"
     if body is None:
@@ -343,18 +339,17 @@ def check_live_tests(report, base, body):
         return
     kind, names = parse_live_tests_section(body)
     if kind == "missing":
-        report.ok(name, "no `## Live tests` list, so the live gate runs every curated method")
+        report.ok(name, "no explicit live selection; recorded client checks run by default, with no automatic live run")
         return
     if kind == "all":
-        report.ok(name, "`## Live tests` asks for all of them")
+        report.ok(name, "explicit live selection asks for all curated methods; evidence is required before PASS")
         return
     curated = curated_live_methods()
     prefix = LIVE_CLASS + "#"
     unshaped = [n for n in names if not JUNIT_NAME.match(n)]
     if unshaped:
-        report.ok(name, "the `## Live tests` list holds an entry that is not a Class#method name, such as "
-                        f"`{unshaped[0][:80]}`, so the dispatcher runs the full suite. Keep only names in the "
-                        "section if a narrower run is wanted.")
+        report.fail(name, f"explicit live selection contains a malformed method: `{unshaped[0][:80]}`. "
+                          "Use qualified Class#method names or `all`; no automatic full run replaces it.")
         return
     wrong = [n for n in names if not n.startswith(prefix) or n[len(prefix):] not in curated]
     problems = []
@@ -363,23 +358,18 @@ def check_live_tests(report, base, body):
                         ", ".join(f"`{n}`" for n in wrong) + f". Each entry must be `{prefix}<method>` with the "
                         "method on the LIVE list in scripts/e2e-emulator.sh, not `@Ignore`d")
     paths = git("diff", "--name-only", base, "HEAD").split()
-    full_paths = split_env_list("PYRY_REAL_CLAUDE_GATE_FULL_PATHS")
-    shared = next((p for p in paths if any(p.startswith(prefix_) for prefix_ in full_paths)), None)
-    if shared is None and LIVE_FILE in paths:
+    if LIVE_FILE in paths:
         diff = git("diff", "--unified=0", base, "HEAD", "--", LIVE_FILE)
         source = (ROOT / LIVE_FILE).read_text(encoding="utf-8")
-        always = {n[len(prefix):] for n in split_env_list("PYRY_REAL_CLAUDE_GATE_ALWAYS_TESTS") if n.startswith(prefix)}
         listed = {n[len(prefix):] for n in names if n.startswith(prefix)}
-        missing = [m for m in affected_live_methods(source, diff, set(curated)) if m not in listed | always]
+        missing = [m for m in affected_live_methods(source, diff, set(curated)) if m not in listed]
         if missing:
             problems.append(f"the diff adds or changes these live methods, directly or through a helper they call, "
                             f"but `## Live tests` omits them: " + ", ".join(f"`{prefix}{m}`" for m in missing) +
                             ". List each, or write `all` when a shared helper changed")
     if problems:
         report.fail(name, "; ".join(problems) + ". Edit the pull request body (builder/device-tests.md, "
-                                                "\"The real-Claude harness\").")
-    elif shared is not None:
-        report.ok(name, f"every name is curated; the branch changes `{shared}`, so the live gate runs everything")
+                                                "\"Recorded client tests and explicit live checks\").")
     else:
         report.ok(name, f"{len(names)} curated name(s), covering every live method the diff changes")
 

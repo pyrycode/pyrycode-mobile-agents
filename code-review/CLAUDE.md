@@ -18,17 +18,11 @@ Review the PR diff. Identify issues. Make a PASS/FAIL decision.
 
 You run **AFTER** the QA agent. QA already verified mechanical gates (`./gradlew check`, `./gradlew assembleDebug`) and applied `done:qa` — you can assume the PR's tree is green when you start. **Do NOT re-run the gates yourself; that's QA's column, not yours.** If you notice a gate-shaped concern that QA missed (e.g., a recomposition bug the test suite didn't trigger), flag it as a MUST FIX finding rather than re-running the gates — the rework cycle will route back through developer → QA before reaching you again.
 
-## Real-claude e2e — verify the scenario exists, don't run it
+## Recorded coverage and explicit live evidence
 
-Every **operator-facing happy-path** feature — anything the operator exercises live on the phone — must carry a **rung-3 real-claude scenario on the `InteractiveStreamE2ETest` harness** (#421 / #431), per the developer definition of done and the ladder doc `docs/e2e-interactive-stream.md`. Your check is **presence, not execution**: an operator-facing flow that shipped without its rung-3 scenario — landed with the feature or filed as a follow-up ticket in the #481 / #482 shape — is a **FAIL routed `needs-rework:developer`**. A missing real-claude scenario is a developer gap, not an architect one.
+Every operator-facing flow needs a recorded scenario or focused native check proving its acceptance. Review the genuine captured message boundary, original assertions and strict request and causal checks. Missing required coverage is a developer gap.
 
-**You do NOT run the emulator suite.** The dispatcher runs managed-device UI and
-scripted scenarios before verifier. A ticket labelled `needs-real-claude` runs the
-live suite after verifier through `python3 scripts/android-test-gate.py live`.
-Confirm the scenario is wired on the harness and read the supplied result when
-available; do not manually boot an emulator or execute the live suite here.
-
-This fires only for a live phone flow. Skip it for data-layer, refactor, or other non-operator-facing tickets.
+Automatic real-Claude routing is retired. Do not add `needs-real-claude` or expect a post-review live run. Explicit live criteria require counted evidence for the named scenario before PASS. Preserve real delivery, encryption, transport, OS integration, timing and current producer checks. Missing evidence uses the operator-blocker route. An expressly authorised later manual acceptance stage requires an operator hold. Do not run the full emulator or live suites yourself.
 
 ## Before Reviewing
 
@@ -181,7 +175,7 @@ If the spec has `## Design source\nN/A — <justification>`, skip this section e
 - **Commit messages** are clear and imperative ("Add channel list ViewModel" not "added the list").
 - **No commented-out code** or `Log.d`/`println` debug calls left behind.
 - **lint clean** — `./gradlew lint` should not report new errors (warnings reviewed case-by-case).
-- **Real-claude e2e scenario present** for an operator-facing happy-path feature — see § "Real-claude e2e — verify the scenario exists, don't run it". A live phone flow shipped without its rung-3 scenario is a MUST FIX routed `needs-rework:developer`.
+- **Recorded or focused native coverage present** for an operator-facing flow. Missing coverage is a MUST FIX routed `needs-rework:developer`. Explicit live requirements need their counted evidence before PASS.
 
 ## Security-sensitive PRs (label-gated)
 

@@ -256,15 +256,25 @@ class RepositoryTest(unittest.TestCase):
         code, out = self.main(body="## Live tests\nall\n")
         self.assertEqual(0, code, out)
 
-    def test_always_run_tests_and_full_paths_need_no_listing(self):
+    def test_stale_automatic_selection_settings_cannot_hide_missing_explicit_methods(self):
         self.commit(pv.LIVE_FILE, LIVE_SOURCE.replace("type(text)", "type(text.trim())"))
         body = f"## Live tests\n{PREFIX}interactiveTurn_alpha\n"
-        with patch.dict("os.environ", {"PYRY_REAL_CLAUDE_GATE_ALWAYS_TESTS": f"{PREFIX}interactiveTurn_beta"}):
-            self.assertEqual(0, self.main(body=body)[0])
-        with patch.dict("os.environ", {"PYRY_REAL_CLAUDE_GATE_FULL_PATHS": "app/src/androidTest/"}):
-            code, out = self.main(body=body)
+        for settings in [{"PYRY_REAL_CLAUDE_GATE_ALWAYS_TESTS": f"{PREFIX}interactiveTurn_beta"},
+                         {"PYRY_REAL_CLAUDE_GATE_FULL_PATHS": "app/src/androidTest/"}]:
+            with self.subTest(settings=settings), patch.dict("os.environ", settings):
+                code, out = self.main(body=body)
+                self.assertEqual(1, code)
+                self.assertIn("omits them", out)
+
+    def test_missing_live_list_does_not_promise_an_automatic_run(self):
+        code, out = self.main(body="## Summary\nrecorded client check\n")
         self.assertEqual(0, code, out)
-        self.assertIn("runs everything", out)
+        self.assertIn("no automatic live run", out)
+
+    def test_malformed_explicit_live_list_cannot_fall_back_to_an_automatic_full_run(self):
+        code, out = self.main(body="## Live tests\nnot a method name\n")
+        self.assertEqual(1, code)
+        self.assertIn("explicit live selection", out)
 
     def test_security_sensitive_ticket_needs_its_review(self):
         self.commit("docs/specs/architecture/42-thing.md", "## Change\nx\n")

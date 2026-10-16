@@ -52,7 +52,7 @@ Since 2026-09-21, Mobile runs a trial: the refiner labels the children of its ow
 - **Every package or directory it names is unambiguous.** Two `components` packages exist, so write the full path.
 - **Any overage against the sizing table is stated on the `Estimate:` line with its reason.** #736 had 33 call sites against a limit of ten and said nothing.
 - **Each helper or wait the child changes still proves what it proved before.** #736 swapped a wait that implied "the list has loaded" for one that did not.
-- **Labels are the child's own.** `needs-real-claude` only where that child's criteria need the live run, `security-sensitive` only where its surface warrants it, and an effort assessment written for that child.
+- **Labels are the child's own.** Do not add the retired `needs-real-claude` label. Apply `security-sensitive` only where the child's surface warrants it. Write an effort assessment for that child.
 
 Then `I add-label CHILD done:refiner`. A child you could not fix within this run stays unlabelled and gets a normal refiner run later, which is always safe. A labelled child that is unblocked moves straight to In Development; a blocked one waits in Backlog until its blocker closes.
 

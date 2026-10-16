@@ -58,7 +58,7 @@ With no re-review section, review the whole diff, even on a rework.
 
 The dispatcher never reads your comments. It reads labels on the issue.
 
-- **PASS:** add no `needs-rework:*` label. The dispatcher applies `done:verifier` and advances the ticket. The one label you may add on a PASS is `needs-real-claude`, described below.
+- **PASS:** add no `needs-rework:*` label. The dispatcher applies `done:verifier` and advances the ticket. Do not add the retired `needs-real-claude` label.
 - **FAIL:** add `needs-rework:builder` to the issue before you finish. Without it the ticket advances even though your comment says FAIL. On 2026-05-07, pyrycode #155 did exactly that and documentation ran against failed code.
 - **Triage routing** follows `triage.md`.
 - Never apply a `done:*` label yourself. The dispatcher owns those.
@@ -77,7 +77,7 @@ labels: <the labels your verdict adds, such as needs-rework:builder on a FAIL>
 <the verdict comment body, exactly as you will post it>
 ```
 
-Take the commit from `gh pr view <PR> --json headRefOid --jq .headRefOid --repo pyrycode/pyrycode-mobile` when you start reviewing, not from the worktree's HEAD. On a PASS leave `labels:` empty, or list only `needs-real-claude`. Never list a `done:*` or `error:*` label.
+Take the commit from `gh pr view <PR> --json headRefOid --jq .headRefOid --repo pyrycode/pyrycode-mobile` when you start reviewing, not from the worktree's HEAD. On a PASS leave `labels:` empty. Never list a `done:*` or `error:*` label.
 
 Then post the verdict and apply its labels as usual. If GitHub refuses the comment or a label, for example with a 5xx error or a timeout, do not retry in a loop. Leave the handoff file as it is and end the run, saying the GitHub write failed. Under Codex, end with status blocked. The dispatcher then posts the saved verdict and applies its labels itself, as long as the PR head still matches the commit. While GitHub stays down it retries on each cycle. On 2026-10-03, #1677's verifier finished with PASS, its post failed with HTTP 503, and the ticket waited nine hours for a person to post the saved file by hand.
 
@@ -98,17 +98,17 @@ The shared docs belong to other stages. The documentation stage owns everything 
 
 You check code and test requirements. Prose documentation belongs to the documentation stage, which runs after you, and that includes protocol reference changes and older documentation-only acceptance criteria. Compare the ticket with the plan's and the PR's **Documentation handoff** and list every pending item in your verdict, carrying forward any the builder missed. Do not fail the implementation because documentation has not been written yet. Wire behaviour, schemas, golden fixtures and tests are implementation, not documentation, and must pass here.
 
-## Live-Claude tests
+## Recorded scenarios and explicit live evidence
 
-Do not run the emulator suites or the live real-Claude suite yourself. The dispatcher runs the device and scripted gates before you, and runs `python3 scripts/android-test-gate.py live` after your PASS, before documentation and merge. The live suite needs a credential, a host daemon and real Claude turns.
+The normal UI gate includes all captured client scenarios in `de.pyryco.mobile.recording`. It drives the native app with genuine captured messages and the original UI assertions, without starting Claude or a daemon. Scripted checks also use zero Claude turns. There is no automatic real-Claude gate after your PASS. `needs-real-claude` no longer routes tickets; do not add or restore it.
 
-The gate runs only the live methods the PR body lists under `## Live tests`, plus a few basic flows, unless the diff touches the connection layer or the test harness. On a `needs-real-claude` ticket, check that list against the diff: every live method the PR adds or changes, and every existing live method that drives a screen, flow or data path the diff changes. A missing method is a fail with a finding naming it. A missing list is a nit, since the gate then runs everything.
+Check recorded coverage and strict request and causal validation alongside the original assertions. Replay cannot prove current provider or daemon behaviour, actual notification delivery, encryption, transport recovery or timing. Preserve the checks that prove those effects.
 
-Your part is routing. If the ticket's acceptance depends on behaviour only real Claude exercises, such as a permission or trust prompt round-trip, reply streaming, an interrupt or queue-drop, a session boundary or a daemon-backed settings round-trip, make sure the issue carries `needs-real-claude`, and add it if it is missing. Pending live acceptance is a handoff, not a failure. A real-Claude regression is a builder fix. Whether the scenario itself exists is a review criterion.
+For an explicit live requirement, inspect counted evidence for the exact scenario and source revisions in the builder or operator handoff. Confirm that the named method ran and passed, with executed, failed and skipped counts. Missing evidence is unfinished acceptance: name the missing run and use the existing operator-blocker route. Do not publish PASS expecting a later automatic gate. If a ticket expressly assigns later manual acceptance, confirm an operator hold exists before handing it over. Documentation records evidence and never produces it.
 
-The live gate keeps its raw captures outside its removed worktree, in the folder its evidence comment names on the "Raw evidence" line: `$AGENTS_REPO_PATH/logs/evidence/<issue>/gate-runs/<stamp>/` with `main/`, `rerun/`, `base/` and `infra-check/` parts. Read per-test XML, logcat, harness logs and session-error arm captures from there. If the named folder is missing, it was pruned or the gate ran on another computer; only a fresh live gate run replaces it, so restore `needs-real-claude` when the captures are required.
+Explicit live checks and recording refreshes remain available through `python3 scripts/android-test-gate.py live --tests <qualified-methods>` and the product's `docs/recorded-tests.md` runbook. Required compatibility comparison remains strict. Do not claim success when it reports differences. Retain fresh XML, phone logs, isolated-daemon diagnostics, source identities and a hash manifest under `$AGENTS_REPO_PATH/logs/evidence/<issue>/<run>/` before cleanup. A missing capture cannot be replaced by an exit code or by old suite totals.
 
-When documentation hands a ticket back over live evidence, read its handoff before issuing another verdict. For a scenario-level requirement, accept a fresh passing result for the named method in a live gate run, and confirm that method ran and passed, not just the suite total. If that evidence is missing, restore `needs-real-claude` so the dispatcher runs its gate. The gate runs the PR's listed methods or the full suite, so if the criterion demands a separate run it cannot supply, report an operator blocker naming the missing command and reason. Do not relax the criterion or ask documentation to run it.
+When documentation returns a ticket over live evidence, read the handoff before issuing another verdict. Preserve the explicit requirement and obtain its evidence or report the exact operator blocker. A real regression returns to the builder. Existing holds, error labels and unresolved live criteria remain in force.
 
 That operator route does not cover a criterion that names a dispatcher setting, flag or command line the configured gate does not use, such as `UI_GATE_FULL=1` on the UI gate in #1797. This applies to every dispatcher gate, not only live. The criterion is met when counted evidence from the configured gate proves what it is for: the named method executed and passed, with the run's executed, failed and skipped counts. Note the mismatch in the verdict. It is never a reason for `status: blocked`, an operator blocker or rework.
 
