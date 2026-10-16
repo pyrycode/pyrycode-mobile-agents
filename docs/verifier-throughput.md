@@ -23,14 +23,27 @@ compileDebugAndroidTestKotlin` in 126 seconds. Its JVM task restored cached
 results for 5718 tests, with zero failures and zero skips. This is a build-cache
 measurement. It does not establish fresh JVM execution time.
 
+The fresh full JVM run then passed 5718 tests with zero failures and zero skips
+in 417.91 seconds. Concurrent unrelated Go and Java workers were present. An
+exact JSON selection of two actual Kotlin methods passed in 17.66 seconds. One
+name contains spaces and a comma. The other contains an apostrophe. Replacing
+a complete JVM comparison with those two methods saved 400.25 seconds in this
+contended measurement. This is a comparison saving, not a reduction on every
+successful verifier. New worktrees may still need compilation.
+
 ## Independently retained checks and named comparisons
 
 Use the exact gate and format settings in `.env.example`. Static checks retain
 the complete `check` dependency graph except its JVM task. That task runs next
-through `scripts/jvm-test-gate.py`, which forces fresh execution and emits joined
-JUnit XML. It retains each original report in the private evidence directory.
-Build logs remain on standard error. A stale, empty, truncated or incomplete
-report cannot pass. Neither can an unexecuted selected method or a nonzero build.
+through `scripts/jvm-test-gate.py`, which emits joined JUnit XML. The default
+run preserves Gradle-verified cache hits. Exact named comparisons force execution.
+It retains each original report in the private evidence directory. Build logs
+remain on standard error. A stale report requires an explicit successful cache
+outcome from the current Gradle invocation. Empty, truncated or incomplete
+reports cannot pass. Neither can an unexecuted selected method or a nonzero build.
+The retained `invocation.json` records the exact command, Gradle task outcome,
+cache-reuse flag and report counts. A reused result records zero tests executed
+in that invocation. Named comparisons record their actual execution count.
 
 All three test gates have exact named baseline commands. The shared dispatcher
 repeats the failing methods once on the same tree and then on the main commit
@@ -42,8 +55,10 @@ retain that scenario's daemon, relay, fixtures, cleanup and XML checks.
 The initial full test selections remain mandatory. No live credential is needed
 for these gates. Explicit live acceptance remains separate. Missing, skipped,
 unknown or malformed selected methods leave the original failure unresolved.
-Method names that the shared dispatcher's strict selector cannot represent also
-remain unresolved. They never silently expand into a complete rerun.
+JVM selection uses a JSON array through `--tests-json` and `{{TESTS_JSON}}`.
+Kotlin method names with spaces, commas and apostrophes remain exact arguments.
+Wildcards and control characters are refused. Malformed selection never expands
+into a complete rerun.
 
 The shared dispatcher retains passing gate prefixes for the same merged tree
 and unchanged ordered gate list. It preserves original failure artifacts.

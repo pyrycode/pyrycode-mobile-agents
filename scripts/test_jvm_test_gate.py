@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -16,7 +17,7 @@ CASE = 'de.pyryco.mobile.ExampleTest#works'
 
 
 class JvmGateTests(unittest.TestCase):
-    def run_gate(self, xml=None, code=0, tests=None, stale=False):
+    def run_gate(self, xml=None, code=0, tests=None, stale=False, log=''):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             reports = root / 'app/build/test-results/testDebugUnitTest'
@@ -28,12 +29,14 @@ class JvmGateTests(unittest.TestCase):
                     if stale:
                         os.utime(path, ns=(1, 1))
                 self.command = command
-                self.assertIs(kwargs['stdout'], gate.sys.stderr)
-                return subprocess.CompletedProcess(command, code)
+                self.assertEqual(kwargs['stdout'], subprocess.PIPE)
+                return subprocess.CompletedProcess(command, code, stdout=log)
             output = io.StringIO()
             with patch.object(gate, 'ROOT', root), patch.object(gate.subprocess, 'run', side_effect=execute), \
                  patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
                 status = gate.run(tests)
+                metadata = list((root / 'build/dispatcher-tests').glob('jvm-*/invocation.json'))
+                self.metadata = json.loads(metadata[0].read_text()) if metadata else None
             return status, output.getvalue()
 
     def test_only_named_methods_are_rerun_and_reported(self):
@@ -64,12 +67,36 @@ class JvmGateTests(unittest.TestCase):
         xml = '<testsuite tests="1" errors="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
         self.assertNotEqual(self.run_gate(xml)[0], 0)
 
+    def test_default_run_keeps_verified_gradle_cache_but_named_comparison_must_execute(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        for status in ['FROM-CACHE', 'UP-TO-DATE']:
+            log = '> Task :app:testDebugUnitTest ' + status + '\n'
+            with self.subTest(status=status):
+                self.assertEqual(self.run_gate(xml, stale=True, log=log)[0], 0)
+                self.assertNotIn('--rerun', self.command)
+                self.assertTrue(self.metadata['reusedGradleResult'])
+                self.assertEqual(self.metadata['executedThisInvocation'], 0)
+                self.assertEqual(self.metadata['gradleTaskOutcome'], status)
+                self.assertNotEqual(self.run_gate(xml, stale=True, log=log, code=1)[0], 0)
+                self.assertNotEqual(self.run_gate(xml, stale=True, log=log, tests=[CASE])[0], 0)
+
     def test_selector_is_exact_and_never_shell_or_gradle_option(self):
         self.assertEqual(gate.parse_tests(CASE + ',' + CASE), [CASE])
         for value in ['', '--tests', 'Other#method', CASE + ';touch /tmp/x', CASE + ',']:
             with self.subTest(value=value):
                 with self.assertRaises(ValueError):
                     gate.parse_tests(value)
+
+    def test_json_selection_preserves_real_kotlin_names_as_one_argument(self):
+        method = "a queued row rests 8dp over the baseline, Figma's $row `name`"
+        name = 'de.pyryco.mobile.ExampleTest#' + method
+        self.assertEqual(gate.parse_tests_json(json.dumps([name])), [name])
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="' + method + '"/></testsuite>'
+        self.assertEqual(self.run_gate(xml, tests=[name])[0], 0)
+        self.assertEqual(self.command[-1], 'de.pyryco.mobile.ExampleTest.' + method)
+        for value in ['[]', '{}', '[1]', json.dumps([name + '*']), json.dumps([name + '\n']), json.dumps(['Other#method'])]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                gate.parse_tests_json(value)
 
 
 if __name__ == '__main__':

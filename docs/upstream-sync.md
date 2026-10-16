@@ -3,7 +3,7 @@
 ## Named verifier comparisons, 2026-10-17
 
 Static, JVM, assembly and device gates retain separate evidence. JVM execution
-emits fresh JUnit XML. JVM, UI and scripted failures have exact named baseline
+emits current-invocation JUnit XML. JVM, UI and scripted failures have exact named baseline
 commands, so comparison does not repeat every passing test. Normal UI and
 scripted selections retain their complete coverage. See
 [verifier throughput](verifier-throughput.md) for measured costs, configuration
