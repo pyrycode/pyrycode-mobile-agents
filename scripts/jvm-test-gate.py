@@ -43,11 +43,14 @@ def run(tests=None):
     command = [str(ROOT / 'gradlew'), ':app:testDebugUnitTest']
     if tests is not None:
         command.append('--rerun')
-    command.append('--console=plain')
+    command += ['--console=plain', '--no-daemon', '-Pkotlin.compiler.execution.strategy=in-process']
     for name in tests or []:
-        command += ['--tests', name.replace('#', '.')]
+        command += ['--tests', name.replace('#', '.', 1)]
     started = time.time_ns()
-    result = subprocess.run(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    env = os.environ.copy()
+    env['GRADLE_OPTS'] = (env.get('GRADLE_OPTS', '') + ' -Dorg.gradle.daemon=false').strip()
+    env['ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy'] = 'in-process'
+    result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     print(result.stdout, end='', file=sys.stderr)
     verified_cache = (tests is None and result.returncode == 0 and
                       re.search(r'^> Task :app:testDebugUnitTest (?:FROM-CACHE|UP-TO-DATE)$', result.stdout, re.MULTILINE))

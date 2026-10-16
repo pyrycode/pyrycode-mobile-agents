@@ -64,9 +64,11 @@ class CleanupCustodyTest(unittest.TestCase):
                         os.killpg(owner.pid, signal.SIGKILL)
                         owner.wait(timeout=3)
 
-    def test_parent_loss_preserves_inherited_device_lock(self):
-        driver = '''import importlib.util,os,pathlib,sys
+    def test_parent_loss_preserves_inherited_device_and_host_locks(self):
+        driver = '''import fcntl,importlib.util,os,pathlib,sys
 spec=importlib.util.spec_from_file_location('gate',sys.argv[1]);g=importlib.util.module_from_spec(spec);spec.loader.exec_module(g)
+host=os.open(pathlib.Path(os.environ['ANDROID_USER_HOME'])/'host-hold',os.O_CREAT|os.O_RDWR,0o600)
+fcntl.flock(host,fcntl.LOCK_EX);os.environ['PYRY_TEST_ADMISSION_FD']=str(host)
 with g.device_hold('parent-loss',0):
  g.run_device_command([sys.executable,'-c',"import os,pathlib,sys,time; pathlib.Path(sys.argv[1]).write_text(str(os.getpgrp())); time.sleep(.6)",sys.argv[2]])
 '''
@@ -85,9 +87,10 @@ with g.device_hold('parent-loss',0):
                 parent.kill()
                 parent.wait(timeout=3)
                 time.sleep(.8)  # Child exit and broken report pipe must not release custody.
-                with open(Path(tmp) / 'avd/pyrycode-device-gate.lock') as lock:
-                    with self.assertRaises(BlockingIOError):
-                        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                for path in ('avd/pyrycode-device-gate.lock', 'host-hold'):
+                    with open(Path(tmp) / path) as lock:
+                        with self.assertRaises(BlockingIOError, msg=path):
+                            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             finally:
                 if parent.poll() is None:
                     parent.kill()

@@ -11,6 +11,13 @@ Mean dispatch-to-verdict time was 16.95 minutes. Deterministic checks took
 12.36 minutes. Final review took 4.20 minutes. These are retained Mac results,
 not measurements of the newly enabled HP and Fractal workers.
 
+Read-only checks on 2026-10-17 also collected the latest twelve completed runs
+from each Linux worker. HP averaged 21.54 minutes. Fractal averaged 32.85 minutes.
+Those samples mix 2026-10-12 through 2026-10-16 runs and early failures. Retained
+full UI reports still predate the complete captured-suite rollout. These figures
+describe historical worker behaviour. They do not establish current normal
+verification time with all 71 captured scenarios.
+
 Four recent complete eight-gate output sets retained their original ordering.
 Their mean JVM/static Gradle invocation took 217 seconds. Application assembly
 added 4.3 seconds. Instrumented Kotlin compilation added 1.7 seconds. UI took
@@ -64,6 +71,30 @@ The shared dispatcher retains passing gate prefixes for the same merged tree
 and unchanged ordered gate list. It preserves original failure artifacts.
 Changed source, commands or provenance invalidate reuse. This requires the
 consumer's shared-dispatcher revision to include that feature.
+
+## Host admission and command lifetime
+
+All configured Gradle gates and documented focused builder commands acquire
+`scripts/test-admission.py` before launching work. Android and JVM compatibility
+entry points acquire it automatically. The host hold is acquired before the
+existing device hold. A nested invocation reuses the validated inherited hold.
+Normal commands wait without starting another build. The dispatcher recognises
+these wait messages when accounting for the worker's time budget.
+
+The shared default lock is `~/.local/share/pyry-fleet/test-admission.lock`.
+`PYRY_TEST_ADMISSION_LOCK` can select an existing shared host-bound volume when
+project containers have different homes. Forward that nonsecret variable into
+builder shells. Existing fleet capacity settings remain unchanged.
+
+Admitted Gradle commands use a single-use worker and in-process Kotlin
+compilation. Build-cache reuse remains enabled. They cannot leave an unrelated
+reusable compiler daemon doing work after their client exits. Android's pinned
+cleanup owner inherits both host and device holds. Parent loss retains both
+holds until confirmed cleanup or operator recovery. A real regression first
+failed when host-descriptor inheritance was absent and passed after it was added.
+The same shared admission script and seven lifecycle tests are copied verbatim
+from Core at the reviewed checksum. Arbitrary raw manual commands bypass this
+admission, so use the documented wrapper for development checks too.
 
 ## Existing coverage that remains
 

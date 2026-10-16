@@ -925,6 +925,11 @@ def run_device_command(command, **kwargs):
     owner, ready = None, False
     try:
         inherited = tuple(kwargs.pop('pass_fds', ()))
+        admission = os.environ.get('PYRY_TEST_ADMISSION_FD')
+        if admission is not None:
+            # The product launcher validated this inherited host hold before
+            # taking the device hold. Keep it through owner and fixture cleanup.
+            inherited += (int(admission),)
         custody = () if _DEVICE_HOLD_FD is None else (_DEVICE_HOLD_FD,)
         owner = subprocess.Popen([sys.executable, str(Path(__file__).with_name('android-device-owner.py')),
                                   str(report_write), str(release_read), ','.join(map(str, inherited)), *command],

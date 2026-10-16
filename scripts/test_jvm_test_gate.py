@@ -43,7 +43,9 @@ class JvmGateTests(unittest.TestCase):
         xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works" time="0.1"/></testsuite>'
         status, output = self.run_gate(xml, tests=[CASE])
         self.assertEqual(status, 0)
-        self.assertEqual(self.command[1:5], [':app:testDebugUnitTest', '--rerun', '--console=plain', '--tests'])
+        self.assertIn('--rerun', self.command)
+        self.assertIn('--no-daemon', self.command)
+        self.assertIn('-Pkotlin.compiler.execution.strategy=in-process', self.command)
         self.assertEqual(self.command[-1], 'de.pyryco.mobile.ExampleTest.works')
         self.assertIn('name="works"', output)
 
