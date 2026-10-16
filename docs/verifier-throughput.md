@@ -97,7 +97,7 @@ The shared default lock is `~/.local/share/pyry-fleet/test-admission.lock`.
 project containers have different homes. Forward that nonsecret variable into
 builder shells. Existing fleet capacity settings remain unchanged.
 
-Admitted Gradle commands use a single-use worker and in-process Kotlin
+Admitted Gradle commands run in the owned client JVM and use in-process Kotlin
 compilation. Build-cache reuse remains enabled. They cannot leave an unrelated
 reusable compiler daemon doing work after their client exits. Android's pinned
 cleanup owner inherits both host and device holds. Parent loss retains both
@@ -114,3 +114,19 @@ transport, encryption, storage, operating-system integration and timing retain
 their existing tests. The large retention proof already has its separate full
 tier. Focused builder checks still run during development. Passing full checks
 remain the acceptance evidence.
+
+
+## Managed Gradle lifetime
+
+Disabling the reusable Gradle daemon alone still forks a single-use worker into a
+new process group. Actual UI acceptance exposed that worker and its emulator
+outside the Android owner's custody. `scripts/gradle-gate.py` now launches the
+installed, pinned Gradle 9.4.1 command directly with JDK 21. It gives the client
+and requested build JVM identical project memory, encoding and required module
+options, and keeps Gradle instrumentation enabled. No detached Gradle worker is
+needed. Kotlin compilation runs inside that same JVM. Caller Java options remain
+present. Incompatible Gradle/JDK policy or a missing installation fails clearly.
+The launcher never stops unrelated Gradle daemons. The external-input snapshot
+includes this launcher, its selected Java executable/release, Gradle entry jar
+and instrumentation agent. Managed static/build, JVM, UI and scripted commands
+all use this launcher under the shared admission lock.

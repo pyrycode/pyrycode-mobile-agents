@@ -40,7 +40,7 @@ def run(tests=None):
     artifacts = Path(os.environ.get('PYRY_GATE_EVIDENCE_DIR') or ROOT / 'build/dispatcher-tests')
     artifacts.mkdir(parents=True, exist_ok=True, mode=0o700)
     destination = Path(tempfile.mkdtemp(prefix='jvm-', dir=artifacts))
-    command = [str(ROOT / 'gradlew'), ':app:testDebugUnitTest']
+    command = [str(ROOT / 'scripts/gradle-gate.py'), ':app:testDebugUnitTest']
     if tests is not None:
         command.append('--rerun')
     command += ['--console=plain', '--no-daemon', '-Pkotlin.compiler.execution.strategy=in-process']
@@ -50,7 +50,8 @@ def run(tests=None):
     env = os.environ.copy()
     env['GRADLE_OPTS'] = (env.get('GRADLE_OPTS', '') + ' -Dorg.gradle.daemon=false').strip()
     env['ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy'] = 'in-process'
-    result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    result = subprocess.run(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                            pass_fds=(int(env['PYRY_TEST_ADMISSION_FD']),) if env.get('PYRY_TEST_ADMISSION_FD') else ())
     print(result.stdout, end='', file=sys.stderr)
     verified_cache = (tests is None and result.returncode == 0 and
                       re.search(r'^> Task :app:testDebugUnitTest (?:FROM-CACHE|UP-TO-DATE)$', result.stdout, re.MULTILINE))

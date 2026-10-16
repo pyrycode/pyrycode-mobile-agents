@@ -1,6 +1,6 @@
 # Device tests for the Pyrycode Mobile builder
 
-Read this when you add or change a test under `app/src/androidTest/`, change a scripted stream scenario, land a real-Claude scenario, or need the emulator to settle a puzzling shared screen test. Shared screen tests under `app/src/sharedTest/` need no device: `python3 scripts/test-admission.py -- ./gradlew --no-daemon -Pkotlin.compiler.execution.strategy=in-process testDebugUnitTest --tests "<class>"` is their focused run.
+Read this when you add or change a test under `app/src/androidTest/`, change a scripted stream scenario, land a real-Claude scenario, or need the emulator to settle a puzzling shared screen test. Shared screen tests under `app/src/sharedTest/` need no device: `python3 scripts/gradle-gate.py testDebugUnitTest --tests "<class>"` is their focused run.
 
 ## Who runs what
 

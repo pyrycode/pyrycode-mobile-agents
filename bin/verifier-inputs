@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -61,22 +62,13 @@ def snapshot(root, product):
     result = {'agentsTree': checkout_tree(root), 'dispatcherTree': checkout_tree(root / 'dispatcher')}
     result['python'] = file_digest([Path(sys.executable)])
     result['pythonVersion'] = sys.version
-    jdk = Path(os.environ['JAVA_HOME']).resolve()
+    managed = root / 'scripts/gradle-gate.py'
+    policy = runpy.run_path(str(managed))
+    jdk, cli, agent = policy['installation'](product, os.environ)
     result['java'] = file_digest([jdk / 'bin/java', jdk / 'release'])
     java_version = subprocess.check_output([str(jdk / 'bin/java'), '-version'], stderr=subprocess.STDOUT, timeout=20)
     result['javaVersion'] = hashlib.sha256(java_version).hexdigest()
-    wrapper = product / 'gradle/wrapper/gradle-wrapper.properties'
-    distribution = re.search(r'gradle-([^/]+)-(bin|all)\.zip', wrapper.read_text())
-    if distribution is None:
-        raise ValueError('Gradle distribution is unknown')
-    cache = Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle')))
-    homes = sorted((cache / 'wrapper/dists' / f'gradle-{distribution[1]}-{distribution[2]}').glob(f'*/gradle-{distribution[1]}'))
-    if not homes:
-        raise ValueError('Gradle distribution has not been installed')
-    gradle_files = [wrapper]
-    for home in homes:
-        gradle_files += [home / 'bin/gradle', home / f'lib/gradle-launcher-{distribution[1]}.jar']
-    result['gradle'] = file_digest(gradle_files)
+    result['gradle'] = file_digest([managed, cli, agent, product / 'gradle/wrapper/gradle-wrapper.properties'])
     sdk = Path(os.environ['ANDROID_HOME']).resolve()
     manifests = [path for path in sdk.rglob('*') if path.is_file() and path.name in ('package.xml', 'source.properties')]
     if not manifests:

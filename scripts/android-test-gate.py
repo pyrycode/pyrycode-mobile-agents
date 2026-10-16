@@ -598,7 +598,7 @@ def device_hold(mode, wait):
 
 def build_apks(env, mode):
     """Build within shared admission and retain custody of compiler descendants."""
-    command = [str(ROOT / "gradlew"), ":app:assembleDebug", ":app:assembleDebugAndroidTest", "--console=plain"]
+    command = [str(ROOT / "scripts/gradle-gate.py"), ":app:assembleDebug", ":app:assembleDebugAndroidTest", "--console=plain"]
     if mode != "ui":
         command.insert(3, "-PuseRelayRepository=true")
     return run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr).returncode
@@ -773,7 +773,7 @@ def main():
         if not shards.isdigit() or int(shards) < 1:
             parser.error("UI_SHARDS must be a positive integer")
         # Animations off on the managed emulator for the run (E2eInstrumentationRunner), as for the scripted runs.
-        command = [str(ROOT / "gradlew"), f":app:{device}DebugAndroidTest", "--rerun",
+        command = [str(ROOT / "scripts/gradle-gate.py"), f":app:{device}DebugAndroidTest", "--rerun",
                    f"-Pandroid.testInstrumentationRunnerArguments.notPackage={E2E_PACKAGE}",
                    f"-Pandroid.experimental.androidTest.numManagedDeviceShards={shards}",
                    "-Pandroid.testInstrumentationRunnerArguments.disableAnimations=true", "--console=plain"]
