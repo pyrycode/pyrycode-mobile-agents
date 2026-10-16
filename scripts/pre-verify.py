@@ -406,11 +406,13 @@ def check_gradle(report):
         report.fail(name, "origin/main has commits this branch lacks. Merge origin/main, then run the unit "
                           "suite and this script again, so the checks see what the verifier will.")
         return
-    for command in (["./gradlew", "spotlessCheck", "--rerun-tasks", "--console=plain"],
-                    ["./gradlew", "compileDebugKotlin", "compileDebugUnitTestKotlin",
+    launcher = [sys.executable, str(ROOT / "scripts/gradle-gate.py")]
+    inherited = (int(os.environ["PYRY_TEST_ADMISSION_FD"]),) if os.environ.get("PYRY_TEST_ADMISSION_FD") else ()
+    for command in ([*launcher, "spotlessCheck", "--rerun-tasks", "--console=plain"],
+                    [*launcher, "compileDebugKotlin", "compileDebugUnitTestKotlin",
                      "compileDebugAndroidTestKotlin", "--console=plain"]):
         # Output stays in the caller's result, so the dispatcher can credit Gradle's build-slot waits.
-        if subprocess.run(command, cwd=ROOT).returncode != 0:
+        if subprocess.run(command, cwd=ROOT, pass_fds=inherited).returncode != 0:
             report.fail(name, f"`{' '.join(command)}` failed on the merged branch; its output is above.")
             return
     report.ok(name, "origin/main is merged, Spotless is clean and every Kotlin source set compiles")
