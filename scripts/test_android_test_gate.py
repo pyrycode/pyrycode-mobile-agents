@@ -1085,14 +1085,14 @@ class DeviceHoldTest(unittest.TestCase):
                 self.assertTrue(all(seen))
                 self.assertFalse(self.held_elsewhere())
 
-    def test_the_apks_are_built_before_the_device_is_taken(self):
+    def test_compilation_and_device_measurements_share_the_same_hold(self):
         for argv in (["ui"], ["scripted", "ping"], ["scripted-all"], ["live"]):
             with self.subTest(argv=argv):
                 held = []
                 self.build.side_effect = lambda env, mode: held.append(
                     (mode, self.path.exists() and self.held_elsewhere())) or 0
                 _, seen, _, _ = self.run_main(argv)
-                self.assertEqual(held, [(argv[0], False)])
+                self.assertEqual(held, [(argv[0], True)])
                 self.assertTrue(seen)
 
     def test_animations_are_off_for_the_scripted_scenarios_but_not_the_live_run(self):
@@ -1111,7 +1111,7 @@ class DeviceHoldTest(unittest.TestCase):
                 for env in [*seen, *self.envs]:
                     self.assertEqual(env["GRADLE_OPTS"], "-Dexample.keep=true -Dorg.gradle.daemon=true -Dorg.gradle.daemon=false")
 
-    def test_a_failed_apk_build_never_takes_the_device(self):
+    def test_a_failed_apk_build_starts_no_tests_and_releases_admission(self):
         self.build.return_value = 3
         for argv in (["ui"], ["scripted-all"], ["live"]):
             with self.subTest(argv=argv):
@@ -1119,8 +1119,8 @@ class DeviceHoldTest(unittest.TestCase):
                 self.assertEqual(result, 1)
                 self.assertEqual(seen, [])
                 self.assertEqual(stdout, "")
-                self.assertIn("APK build exited 3; the device was not taken", stderr)
-                self.assertFalse(self.path.exists() and self.path.read_text())
+                self.assertIn("APK build exited 3; no device test was started", stderr)
+                self.assertFalse(self.held_elsewhere())
 
     def test_the_apk_build_uses_each_modes_build_properties(self):
         # The e2e modes match scripts/e2e-emulator.sh's GRADLE_BUILD_ARGS, so its test task finds both APKs current.
