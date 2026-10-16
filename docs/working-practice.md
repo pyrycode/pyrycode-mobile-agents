@@ -136,6 +136,8 @@ When a role runs device or scripted tests on this host:
 
 ### Android cleanup custody
 
+Focused non-live device checks use `python3 scripts/android-test-gate.py ui --tests package.Class#method`. They use the same admission and report checks as complete gates. The device hold now covers compilation too. Kotlin runs in the owned Gradle process. APK and test commands both use the existing cleanup owner. A failed build starts no device tests and releases the hold only after cleanup is confirmed. No timing thresholds or acceptance retries change.
+
 The Android gate keeps a small owner process alive until its test process group
 has stopped. The owner also inherits the device lock. Numeric process-state
 inspection confirms exit without using a signal-zero permission probe. The owner

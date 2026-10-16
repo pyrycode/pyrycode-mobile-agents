@@ -56,6 +56,23 @@ def parse_live_tests(value):
     return list(dict.fromkeys(names)) or None
 
 
+def parse_ui_tests(value):
+    """Bounded instrumentation selectors, never shell commands or other packages."""
+    names=[part.strip() for part in value.split(',')]
+    pattern=r'de\.pyryco\.mobile(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+(?:#[A-Za-z_$][A-Za-z0-9_$]*)?'
+    if len(value)>8192 or len(names)>64 or any(not re.fullmatch(pattern,name) or name.startswith(E2E_PACKAGE+'.') for name in names):return None
+    return list(dict.fromkeys(names))
+
+
+def require_selected_tests(xml,selectors):
+    cases=ET.fromstring(xml).findall('.//testcase')
+    executed={(case.get('classname'),case.get('name')) for case in cases if case.find('skipped') is None}
+    for selector in selectors:
+        owner,_,method=selector.partition('#')
+        if not any(c==owner and (not method or n==method) for c,n in executed):
+            raise ValueError('A selected Android test did not execute: '+selector)
+
+
 class ClaudeEnvironmentError(RuntimeError):
     """A missing live-test credential is setup failure, not a test verdict."""
 
@@ -580,17 +597,11 @@ def device_hold(mode, wait):
 
 
 def build_apks(env, mode):
-    """Build the app and test APKs before queueing for the device, and return Gradle's exit code.
-
-    A cold build took 40 seconds to 3 minutes, and every other device run waited behind it while it held the
-    device (measured 2026-10-04). Now the hold covers only boot, install and run: the device task and the
-    emulator script find both APKs up to date. The e2e modes build with the emulator script's -P properties
-    (GRADLE_BUILD_ARGS there), so its test task's up-to-date check matches.
-    """
+    """Build within shared admission and retain custody of compiler descendants."""
     command = [str(ROOT / "gradlew"), ":app:assembleDebug", ":app:assembleDebugAndroidTest", "--console=plain"]
     if mode != "ui":
         command.insert(3, "-PuseRelayRepository=true")
-    return subprocess.run(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr).returncode
+    return run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr).returncode
 
 
 def raise_interrupt(*_):
@@ -664,18 +675,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("ui", "scripted", "scripted-all", "live"))
     parser.add_argument("scenario", nargs="?", choices=SCENARIOS)
-    parser.add_argument("--tests", help="live only: a comma-separated Class#method list to run instead of the "
-                        "curated list. The dispatcher's flake re-run and main comparison pass the failed tests here.")
+    parser.add_argument("--tests", help="ui: comma-separated package.Class or Class#method selectors; live: curated Class#method subset")
     args = parser.parse_args()
     if (args.mode == "scripted") != (args.scenario is not None):
         parser.error("scripted requires one scenario; ui and live take no scenario")
     live_tests = None
+    ui_tests = None
     if args.tests is not None:
-        if args.mode != "live":
-            parser.error("--tests applies to live only")
-        live_tests = parse_live_tests(args.tests)
-        if live_tests is None:
-            parser.error(f"--tests must be a comma-separated list of {LIVE_CLASS}#method names")
+        if args.mode == 'ui':
+            ui_tests=parse_ui_tests(args.tests)
+            if not ui_tests:parser.error('--tests requires Mobile package.Class or Class#method selectors')
+        elif args.mode == 'live':
+            live_tests = parse_live_tests(args.tests)
+            if live_tests is None:parser.error(f"--tests must be a comma-separated list of {LIVE_CLASS}#method names")
+        else:parser.error('--tests applies to ui or live only')
     device = os.environ.get("DEVICE", "pixel2Api33Atd")
     if not device.isalnum():
         parser.error("DEVICE must be an alphanumeric Gradle device name")
@@ -686,7 +699,7 @@ def main():
     if not math.isfinite(wait) or wait < 0:
         parser.error("ANDROID_GATE_WAIT_SECONDS must be a non-negative number of seconds")
     # UI_GATE_FULL=1 runs the suite even on a branch that cannot affect it.
-    if args.mode == "ui" and os.environ.get("UI_GATE_FULL") != "1" and ui_suite_skippable(changed_paths()):
+    if args.mode == "ui" and not ui_tests and os.environ.get("UI_GATE_FULL") != "1" and ui_suite_skippable(changed_paths()):
         print("Android gate: ui skipped; the branch changes only docs, scripts and e2e-only tests", file=sys.stderr)
         return 0
     # The dispatcher's live gate runs in a detached worktree it removes afterwards, so it names a folder
@@ -697,6 +710,11 @@ def main():
     artifacts = Path(gate_evidence) if gate_evidence else ROOT / "build" / "dispatcher-tests"
     artifacts.mkdir(parents=True, exist_ok=True, mode=0o700)
     run_dir = Path(tempfile.mkdtemp(prefix=f"{args.mode}-", dir=artifacts))
+    def phase(name):
+        with (run_dir/'phases.jsonl').open('a') as output:
+            output.write(json.dumps({'phase':name,'at':time.time(),'monotonic':time.monotonic(),
+                                     'load':list(os.getloadavg())})+'\n')
+    phase('created')
     env = os.environ.copy()
     if gate_evidence:
         # The harness runs from the checkout, so it gets the same absolute folder.
@@ -705,6 +723,11 @@ def main():
     # A managed gate owns the build worker's lifetime as well as its test fixtures.
     # Preserve operator JVM options while overriding any reusable-daemon preference.
     env["GRADLE_OPTS"] = (env.get("GRADLE_OPTS", "") + " -Dorg.gradle.daemon=false").strip()
+    # Kotlin's reusable compiler daemon outlives Gradle's worker setting. Keep
+    # compilation in the owned Gradle process so cleanup also owns its lifetime.
+    env['ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy']='in-process'
+    env.pop('PYRY_GATE_SELECTED_TESTS',None)
+    if ui_tests:env['PYRY_GATE_SELECTED_TESTS']=','.join(ui_tests)
     env["PYRY_FORCE_TEST_RUN"] = "1"
     # Each invocation owns a test daemon identity, never the user's running daemon.
     identity = "e2e-auto-" + uuid.uuid4().hex[:8]
@@ -724,8 +747,8 @@ def main():
                    f"-Pandroid.testInstrumentationRunnerArguments.notPackage={E2E_PACKAGE}",
                    f"-Pandroid.experimental.androidTest.numManagedDeviceShards={shards}",
                    "-Pandroid.testInstrumentationRunnerArguments.disableAnimations=true", "--console=plain"]
-        if not full:
-            classes = device_only_classes()
+        if ui_tests or not full:
+            classes = ui_tests or device_only_classes()
             if not classes:
                 print("Android gate: no device-only test classes found under app/src/androidTest", file=sys.stderr)
                 return 1
@@ -762,36 +785,41 @@ def main():
         if not claude_authenticated(env):
             print("Android gate: Claude authentication unavailable. Run through the dispatcher's 1Password environment or sign in to Claude.", file=sys.stderr)
             return 1
-    # Build test-only binaries from the configured sibling checkouts. Go's cache
-    # keeps this cheap, and production daemon executables are never replaced.
-    # One fixed folder per checkout, not the run's own: Go then skips relinking an
-    # unchanged binary, about 15 seconds across the seven scripted scenarios.
-    if args.mode != "ui":
-        for variable, source_variable, package, binary in (
-            ("PYRY_BIN", "PYRYCODE_SRC", "./cmd/pyry", "pyry"),
-            ("RELAY_BIN", "PYRYCODE_RELAY_SRC", "./cmd/pyrycode-relay", "pyrycode-relay"),
-        ):
-            if variable == "RELAY_BIN" and args.mode == "live":
-                continue
-            if env.get(variable) or not env.get(source_variable):
-                continue
-            destination = ROOT / "build" / "e2e-bin" / binary
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            build = subprocess.run(["go", "build", "-o", str(destination), package],
-                                   cwd=env[source_variable], env=env, stdout=sys.stderr, stderr=sys.stderr)
-            if build.returncode:
-                print(f"Android gate: failed to build {binary}", file=sys.stderr)
-                return 1
-            env[variable] = str(destination)
-    built = build_apks(env, args.mode)
-    if built != 0:
-        print(f"Android gate failed: the app and test APK build exited {built}; the device was not taken",
-              file=sys.stderr)
-        return 1
-    env["E2E_APKS_BUILT"] = "1"
+    phase('waiting-for-admission')
     try:
         with device_hold(args.mode, wait):
+            phase('admitted')
+            phase('preparation-started')
+            # Build test-only binaries from the configured sibling checkouts. Go's cache
+            # keeps this cheap, and production daemon executables are never replaced.
+            # One fixed folder per checkout, not the run's own: Go then skips relinking an
+            # unchanged binary, about 15 seconds across the seven scripted scenarios.
+            if args.mode != "ui":
+                for variable, source_variable, package, binary in (
+                    ("PYRY_BIN", "PYRYCODE_SRC", "./cmd/pyry", "pyry"),
+                    ("RELAY_BIN", "PYRYCODE_RELAY_SRC", "./cmd/pyrycode-relay", "pyrycode-relay"),
+                ):
+                    if variable == "RELAY_BIN" and args.mode == "live":
+                        continue
+                    if env.get(variable) or not env.get(source_variable):
+                        continue
+                    destination = ROOT / "build" / "e2e-bin" / binary
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    build = run_device_command(["go", "build", "-o", str(destination), package],
+                                           cwd=env[source_variable], env=env, stdout=sys.stderr, stderr=sys.stderr)
+                    if build.returncode:
+                        print(f"Android gate: failed to build {binary}", file=sys.stderr)
+                        return 1
+                    env[variable] = str(destination)
+            built = build_apks(env, args.mode)
+            phase('preparation-finished')
+            if built != 0:
+                print(f"Android gate failed: the app and test APK build exited {built}; no device test was started",
+                      file=sys.stderr)
+                return 1
+            env["E2E_APKS_BUILT"] = "1"
             print(f"Android gate: {args.mode} {args.scenario or ''}; artifacts: {run_dir}", file=sys.stderr)
+            phase('device-command-started')
             if args.mode == "scripted-all":
                 return run_scripted_all(env, run_dir, device)
             run = run_live_on_device if args.mode == "live" else run_on_device
@@ -802,6 +830,8 @@ def main():
     except DeviceBusy as busy:
         print(f"Android gate: device busy, not a test result: {busy}", file=sys.stderr)
         return DEVICE_BUSY_EXIT
+    finally:
+        phase('finished')
 
 
 def run_live_on_device(command, env, run_dir, device, minimum, expected_class):
@@ -942,6 +972,8 @@ def run_on_device(command, env, run_dir, device, minimum, expected_class):
         directory = results / "connected/debug" if device == "connected" else results / "managedDevice/debug" / device
         outcome, paths = run_with_reports(command, env, directory, started, run_dir, "")
         xml, passed, executed = combine_reports(paths, expected_class)
+        if env.get('PYRY_GATE_SELECTED_TESTS'):
+            require_selected_tests(xml,parse_ui_tests(env['PYRY_GATE_SELECTED_TESTS']) or [])
         (run_dir / "dispatcher.xml").write_text(xml + "\n")
         print(xml)
         failed_count = len(ET.fromstring(xml).findall(".//failure"))

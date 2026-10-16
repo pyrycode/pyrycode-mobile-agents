@@ -20,13 +20,10 @@ When a shared screen test fails and the failure makes no sense from the code, ru
 One method or class on the managed Android 13 device, from your worktree:
 
 ```bash
-./gradlew :app:pixel2Api33AtdDebugAndroidTest --rerun \
-  '-Pandroid.testInstrumentationRunnerArguments.class=fully.qualified.TestClass#testMethod' \
-  -Pandroid.testInstrumentationRunnerArguments.notPackage=de.pyryco.mobile.e2e \
-  --console=plain
+python3 scripts/android-test-gate.py ui --tests 'de.pyryco.mobile.package.TestClass#testMethod'
 ```
 
-Drop `#testMethod` to run the whole class. Keep the selection narrow. The task boots and tears down its own device, and `--rerun` forces a fresh run while keeping upstream build caching. If the worktree has no `local.properties`, Gradle needs `ANDROID_HOME`, which the dispatcher provides.
+Drop `#testMethod` to run the whole class. Keep the selection narrow. Explicit selections run even when changed-file classification would skip the ordinary UI suite. Each selected method must actually execute without skipping. The gate shares one admission queue for compilation and device work. APK compilation uses the same process ownership and cleanup as the tests. Kotlin compiles inside the owned Gradle process, rather than leaving a reusable compiler daemon. This prevents another managed gate from compiling during a timing measurement. Existing unrelated compiler processes need a separate ownership check before an operator stops them. If the worktree has no `local.properties`, Gradle needs `ANDROID_HOME`, which the dispatcher provides.
 
 One named live repair test:
 
