@@ -73,13 +73,13 @@ def launch(root, args, env):
             clean_args.append(token)
     options = shlex.split(requested) + caller + MODULE_OPTIONS
     options = list(dict.fromkeys(options))
-    ambient = []
-    for name in ('JAVA_TOOL_OPTIONS', 'JDK_JAVA_OPTIONS', '_JAVA_OPTIONS'):
-        ambient += shlex.split(env.get(name, ''))
+    prefix = shlex.split(env.get('JAVA_TOOL_OPTIONS', '')) + shlex.split(env.get('JDK_JAVA_OPTIONS', ''))
+    suffix = shlex.split(env.get('_JAVA_OPTIONS', ''))
+    ambient = [*prefix, *suffix]
     if any('org.gradle.internal.instrumentation.agent=false' in token for token in [*options, *ambient, *args]):
         raise ValueError('managed checks preserve Gradle instrumentation')
     # CurrentProcess filters this agent before comparing client/build JVM options.
-    effective = [*options, *ambient]
+    effective = [*prefix, *options, *suffix]
     required = shlex.join(effective)
     child_env = env.copy()
     child_env['ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy'] = 'in-process'

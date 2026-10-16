@@ -28,6 +28,20 @@ class VerifierInputsTests(unittest.TestCase):
             paths[1].write_text('updated tool')
             self.assertNotEqual(second, inputs.file_digest(paths))
 
+    def test_active_user_gradle_properties_and_init_scripts_are_bound(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            before = inputs.gradle_user_inputs(root)
+            (root / 'gradle.properties').write_text('org.gradle.workers.max=2')
+            self.assertNotEqual(before, inputs.gradle_user_inputs(root))
+            before = inputs.gradle_user_inputs(root)
+            (root / 'init.d').mkdir()
+            (root / 'init.d/pyry-build-slots.gradle').write_text('changed build execution')
+            self.assertNotEqual(before, inputs.gradle_user_inputs(root))
+            before = inputs.gradle_user_inputs(root)
+            (root / 'init.d/pyry-build-slots.gradle').write_text('different build execution')
+            self.assertNotEqual(before, inputs.gradle_user_inputs(root))
+
     def test_dirty_or_uninitialized_external_checkout_cannot_reuse_gates(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

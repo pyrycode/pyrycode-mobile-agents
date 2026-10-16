@@ -51,6 +51,16 @@ class GradleGateTests(unittest.TestCase):
             self.assertEqual(command[-1], "a name, with 'quotes' and $value")
             self.assertEqual(child['JAVA_OPTS'], env['JAVA_OPTS'])
 
+    def test_ambient_heap_precedence_matches_the_actual_java_launcher(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root, env = self.fixture(directory)
+            env.update(JAVA_TOOL_OPTIONS='-Xmx3072m', JDK_JAVA_OPTIONS='-Xmx4096m', _JAVA_OPTIONS='-Xmx1536m')
+            command, _ = gate.launch(root, ['help'], env)
+            requested = next(arg for arg in command if arg.startswith('-Dorg.gradle.jvmargs='))
+            self.assertLess(requested.index('-Xmx3072m'), requested.index('-Xmx4096m'))
+            self.assertLess(requested.index('-Xmx4096m'), requested.index('-Xmx2048m'))
+            self.assertLess(requested.index('-Xmx2048m'), requested.index('-Xmx1536m'))
+
     def test_incompatible_or_missing_installation_never_silently_changes_jdk(self):
         with tempfile.TemporaryDirectory() as directory:
             root, env = self.fixture(directory)

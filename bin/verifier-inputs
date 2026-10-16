@@ -58,6 +58,14 @@ def go_inputs(source):
     return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
 
 
+def gradle_user_inputs(home):
+    files = [home / name for name in ('gradle.properties', 'init.gradle', 'init.gradle.kts') if (home / name).exists()]
+    files += [path for path in (home / 'init.d').rglob('*') if path.is_file()]
+    if any(path.is_symlink() for path in files):
+        raise ValueError('Gradle user inputs use external symlinks')
+    return file_digest(files)
+
+
 def snapshot(root, product):
     result = {'agentsTree': checkout_tree(root), 'dispatcherTree': checkout_tree(root / 'dispatcher')}
     result['python'] = file_digest([Path(sys.executable)])
@@ -69,6 +77,7 @@ def snapshot(root, product):
     java_version = subprocess.check_output([str(jdk / 'bin/java'), '-version'], stderr=subprocess.STDOUT, timeout=20)
     result['javaVersion'] = hashlib.sha256(java_version).hexdigest()
     result['gradle'] = file_digest([managed, cli, agent, product / 'gradle/wrapper/gradle-wrapper.properties'])
+    result['gradleUserInputs'] = gradle_user_inputs(Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle'))))
     sdk = Path(os.environ['ANDROID_HOME']).resolve()
     manifests = [path for path in sdk.rglob('*') if path.is_file() and path.name in ('package.xml', 'source.properties')]
     if not manifests:
