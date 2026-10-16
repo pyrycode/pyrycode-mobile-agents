@@ -1,6 +1,6 @@
 # Triage for the Pyrycode Mobile verifier
 
-Read this when your gate note says **TRIAGE MODE**. The goal is to decide, mechanically where possible, whether this PR caused the red. A PR that fixes one thing while unmasking older fragility elsewhere should not be sent back for rework it cannot do. Before this procedure existed, such PRs burned three or more rework cycles. The baseline comparison is the deterministic check under your own first reading of the failure. Any baseline run adds a cold Gradle build in a second worktree, so start it before reading anything else, in the foreground.
+Read this when your gate note says **TRIAGE MODE**. The goal is to decide, mechanically where possible, whether this PR caused the red. A PR that fixes one thing while unmasking older fragility elsewhere should not be sent back for rework it cannot do. Before this procedure existed, such PRs burned three or more rework cycles. The baseline comparison is the deterministic check under your own first reading of the failure. Read the dispatcher's named comparison first. It already ran before this handoff and retains both the original failure and each comparison. Do not repeat its completed work.
 
 ## Classify the red
 
@@ -11,7 +11,7 @@ The injected failure context names the failing gate and carries its output tail.
 | `python3 scripts/pre-verify.py` failed | **red (pre-verify failure)**, never pre-existing | Each `FAIL` line names a check that this PR's own diff, plan or PR body fails, against the merge base, so no baseline run is needed. Confirm each line from the source, then FAIL with `needs-rework:builder` and one finding per line. A `skip` or `note` line is not a failure. If a line is plainly wrong, say so in the verdict and judge that point yourself. |
 | `scripts/docs-guard.sh` failed | **red (docs failure)**, and almost always pre-existing | The builder cannot write `docs/knowledge/features/`, so this is rarely the PR's doing. Confirm by hand: run the guard in a merge-base worktree and check it reports the same paths. If it does, route it as case 2 under "Routing after the comparison". Only a false heading or an oversized file inside the PR's own diff is a regression, and that routes to `needs-rework:builder`. |
 | `python3 -m unittest discover -s scripts` failed | **red (script test failure)** | Compare by hand the same way. If the PR's diff leaves `scripts/` untouched and the same tests fail at the merge base, route as case 2. Otherwise it is a regression for `needs-rework:builder`. |
-| `./gradlew check` failed and failing unit tests are extractable as `ClassName > testMethod FAILED` lines | **red (test failure)** | Run the baseline comparison below. Routing depends on the regression and pre-existing partition. |
+| `jvm-test-gate.py` failed with named JUnit failures | **red (test failure)** | Use the dispatcher's same-tree and baseline comparisons below. Only unresolved names need further investigation. |
 | `./gradlew check` failed with no `FAILED` test lines, but the log shows a lint or Spotless failure, such as `> Task :app:lintDebug FAILED`, `Lint found … errors`, `> Task :spotlessKotlinCheck FAILED` or a ktlint diff | **red (format or lint failure)** | Follow "Inherited format or lint failure" below. |
 | `./gradlew assembleDebug` failed | **red (build failure)** | Always a regression, because the PR's tree does not compile or link resources. `needs-rework:builder` immediately, with no baseline run. |
 | `./gradlew compileDebugAndroidTestKotlin` failed | **red (build failure)** | Same routing: the instrumented set does not compile. Say so in the verdict, so the builder looks under `app/src/androidTest/` and `app/src/sharedTest/`. |
@@ -20,15 +20,16 @@ The injected failure context names the failing gate and carries its output tail.
 
 The gates run in order and stop at the first red. A pre-verify failure means nothing else ran, so the build status is unknown; review the rest of the diff from source and name the gates that did not run. A docs failure means only pre-verify ran before it. A `check` failure means the docs guard and script tests passed and the build never ran. A build failure means the unit suite, lint and Spotless already passed. A device or scripted failure means every compile gate passed. Say which gates ran in the verdict. `./gradlew assembleDebug` is also part of the builder's own gate, so a red there is a builder that skipped its verification step. `SDK location not found` is the dispatch environment missing `ANDROID_HOME`, not the PR; classify it as infra and name the variable.
 
-**Getting the PR-side log.** Prefer the injected context: if it holds the full `./gradlew check` output, save it to `$V/check.log`. If it is only a tail without parseable `FAILED` lines on a test-tier failure, reproduce once in the PR worktree with `./gradlew check 2>&1 | tee "$V/check.log"` to capture the full log. That reproduction is triage, not a gate re-run, and it is the one situation where you run `./gradlew check` yourself.
+**Getting the PR-side evidence.** Read the retained original XML and invocation
+metadata named by the dispatcher. The JVM wrapper emits joined JUnit XML and
+retains build logs separately. A successful Gradle cache hit is labelled reused,
+with zero methods executed in that invocation. Exact named comparisons force
+execution. Do not reproduce a complete green gate to obtain a more convenient log.
 
-Extract failing unit-test names. Gradle prints one line per failed test, shaped `<FullyQualifiedClassName> > <testMethod>[(...)] FAILED`:
-
-```bash
-grep -E ' > .+ FAILED$' "$V/check.log" | sed -E 's/^.* ([A-Za-z0-9_.]+) > (.+) FAILED$/\1.\2/' | sort -u
-```
-
-This yields `ClassName.testMethod` per failing unit test, the name set the baseline run compares with `comm`. If the console format drifts, fall back to the JUnit XML under `app/build/test-results/**/TEST-*.xml`, where each failed `<testcase classname=… name=…>` carries a `<failure>` child.
+Extract failed JVM identities from the original XML as complete
+`classname#name` strings. Keep them in a JSON array. Kotlin names may contain
+spaces, commas or apostrophes, so console-line parsing and comma splitting lose
+valid identities. A missing report or build failure supplies no named baseline.
 
 ## Inherited format or lint failure
 
@@ -42,52 +43,28 @@ When a test regression or a format or lint failure is understood and the PR is k
 
 ## Baseline comparison for a red unit tier
 
-Do not route a test failure to `needs-rework:builder` on sight. Re-run `./gradlew check` against the PR's merge-base in a temporary worktree, then classify each failing test as `regression`, passing on baseline and failing on the PR, or `pre_existing`, failing on both. Skip this comparison for a build, format, lint, docs or infra red.
+The dispatcher runs exact failed methods once on the same merged tree. Methods
+that pass there are recorded as intermittent. Remaining methods run on the main
+commit merged into that tree. Use its comparison report and original artifacts.
+A completed comparison must not be repeated by hand.
 
-The baseline worktree has no `local.properties` either. Gradle finds the SDK through `ANDROID_HOME` as the gate did, and shares the daemon and dependency cache with your worktree, so the run is cold on compilation only.
+If a manual comparison is necessary because no complete dispatcher comparison
+exists, run only the unresolved method identities through
+`python3 scripts/jvm-test-gate.py --tests-json '<JSON array>'`. Pass the JSON as
+one argument through the execution tool. Never interpolate method names into a
+shell command. The wrapper converts each identity to one literal Gradle selector.
+Run the same selection at the recorded merged-main commit in an isolated
+worktree. Keep the same SDK and JVM settings. Preserve both commands' exit codes
+and XML. Each selected method must execute without skipping. Unknown or missing
+methods establish no result. Device and scripted comparisons use the matching
+`android-test-gate.py ui --tests` or `scripted-all --tests` command from the gate
+configuration. They retain the original scenario and device admission.
 
-```bash
-# 1. PR-side failing test names, already extracted above:
-PR_FAILS=$(grep -E ' > .+ FAILED$' "$V/check.log" | sed -E 's/^.* ([A-Za-z0-9_.]+) > (.+) FAILED$/\1.\2/' | sort -u)
-if [ -z "$PR_FAILS" ]; then
-  # Defensive: red:test without parseable names should have classified as
-  # infra-failure. If it didn't, fall through to standard red routing.
-  echo "verifier: red:test with no parseable failing names; routing as standard red" >&2
-else
-  # 2. Resolve baseline ref: the merge-base is where this PR diverged from main.
-  BASELINE_REF=$(git merge-base HEAD origin/main 2>/dev/null)
-  if [ -z "$BASELINE_REF" ]; then
-    echo "verifier: merge-base unresolved; routing as standard red" >&2
-  else
-    # 3. Detached worktree at the baseline. `git worktree add` accepts an
-    #    existing EMPTY directory, which is what mktemp -d gives us.
-    BASELINE_DIR=$(mktemp -d -t baseline-verifier-XXXXXX)
-    if ! git worktree add --detach "$BASELINE_DIR" "$BASELINE_REF" >/dev/null 2>&1; then
-      echo "verifier: baseline worktree add failed; routing as standard red" >&2
-      rmdir "$BASELINE_DIR" 2>/dev/null || true   # nothing was checked out; don't leak the dir
-    else
-      # 4. Run ./gradlew check there. `&>` captures BOTH stdout and stderr:
-      #    Gradle writes lint and Spotless diagnostics to stderr and we need them
-      #    in the log for accurate comparison. (`2>&1 > file` is wrong-ordered.)
-      (cd "$BASELINE_DIR" && ./gradlew check) &> "$V/baseline-check.log" || true
-      if [ -s "$V/baseline-check.log" ]; then
-        BASELINE_FAILS=$(grep -E ' > .+ FAILED$' "$V/baseline-check.log" | sed -E 's/^.* ([A-Za-z0-9_.]+) > (.+) FAILED$/\1.\2/' | sort -u)
-        # 5. Partition: comm -23 = in PR_FAILS only (regressions, PR caused them);
-        #    comm -12 = in both (pre_existing, PR did not cause them).
-        REGRESSIONS=$(comm -23 <(echo "$PR_FAILS") <(echo "$BASELINE_FAILS"))
-        PRE_EXISTING=$(comm -12 <(echo "$PR_FAILS") <(echo "$BASELINE_FAILS"))
-      else
-        echo "verifier: baseline log empty or not produced; routing as standard red" >&2
-        REGRESSIONS="$PR_FAILS"
-        PRE_EXISTING=""
-      fi
-      # 6. Clean up the baseline worktree, always, since leaks rot the dispatcher's
-      #    worktree list. Never force it; if Git refuses, report the path.
-      git worktree remove "$BASELINE_DIR" >/dev/null 2>&1 || true
-    fi
-  fi
-fi
-```
+Classify each unresolved method as `regression` only when it passes on baseline
+and fails on the PR, or `pre_existing` when it fails on both. The dispatcher
+requires an open tracking ticket before accepting an inherited failure. Preserve
+its tracking decision. A passing narrow run does not prove that a full-suite
+ordering failure vanished. Keep that failure's original evidence.
 
 **Routing after the comparison**, three cases:
 

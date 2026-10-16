@@ -1,6 +1,7 @@
 import contextlib
 import importlib.util
 import io
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -181,6 +182,22 @@ class AffectedLiveMethodsTest(unittest.TestCase):
     def test_a_new_test_is_affected(self):
         new = LIVE_SOURCE.replace("    private fun send(", "    @Test\n    fun interactiveTurn_delta() {\n        openThread()\n    }\n\n    private fun send(")
         self.assertEqual(["interactiveTurn_delta"], pv.affected_live_methods(new, hunk_for(LIVE_SOURCE, new), self.live | {"interactiveTurn_delta"}))
+
+
+class ManagedGradleTest(unittest.TestCase):
+    def test_final_builder_checks_use_admitted_launcher_and_forward_the_host_hold(self):
+        report = pv.Report()
+        with patch.object(pv.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)) as run, \
+             patch.dict(os.environ, {'PYRY_TEST_ADMISSION_FD': '42'}):
+            pv.check_gradle(report)
+        builds = run.call_args_list[2:]
+        self.assertEqual(2, len(builds))
+        for call in builds:
+            self.assertEqual([pv.sys.executable, str(pv.ROOT / 'scripts/gradle-gate.py')], call.args[0][:2])
+            self.assertEqual((42,), call.kwargs['pass_fds'])
+        self.assertIn('spotlessCheck', builds[0].args[0])
+        self.assertIn('compileDebugAndroidTestKotlin', builds[1].args[0])
+        self.assertEqual([], report.failures)
 
 
 class RepositoryTest(unittest.TestCase):

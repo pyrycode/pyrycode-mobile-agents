@@ -1131,7 +1131,7 @@ class DeviceHoldTest(unittest.TestCase):
                 run = Mock(return_value=subprocess.CompletedProcess([], 4))
                 with patch.object(gate, "ROOT", root), patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run):
                     self.assertEqual(REAL_BUILD_APKS({"K": "v"}, mode), 4)
-                self.assertEqual(run.call_args.args[0], [str(root / "gradlew"), ":app:assembleDebug",
+                self.assertEqual(run.call_args.args[0], [str(root / "scripts/gradle-gate.py"), ":app:assembleDebug",
                                                          ":app:assembleDebugAndroidTest", *properties, "--console=plain"])
                 self.assertEqual(run.call_args.kwargs["env"], {"K": "v"})
                 self.assertEqual(run.call_args.kwargs["cwd"], root)

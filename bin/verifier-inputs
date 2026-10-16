@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""Describe external Mobile gate inputs without printing environment values."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import runpy
+import shutil
+import subprocess
+import sys
+
+
+def run(*args, cwd=None):
+    return subprocess.check_output(args, cwd=cwd, stderr=subprocess.PIPE, timeout=20).decode().strip()
+
+
+def checkout_tree(path):
+    path = path.resolve()
+    if Path(run('git', '-C', str(path), 'rev-parse', '--show-toplevel')).resolve() != path:
+        raise ValueError('external tooling checkout is uninitialized')
+    if run('git', '-C', str(path), 'status', '--porcelain', '--untracked-files=no'):
+        raise ValueError('external tooling checkout has local changes')
+    tree = run('git', '-C', str(path), 'rev-parse', 'HEAD^{tree}')
+    untracked = run('git', '-C', str(path), 'ls-files', '--others', '--exclude-standard', '-z')
+    files = [path / name for name in untracked.split('\0') if name]
+    if any(file.is_symlink() for file in files):
+        raise ValueError('untracked symlink inputs are external')
+    return {'tree': tree, 'untrackedDigest': file_digest(files)}
+
+
+def file_digest(paths):
+    result = hashlib.sha256()
+    for path in sorted(set(paths)):
+        result.update(str(path.resolve()).encode())
+        result.update(b'\0')
+        with path.open('rb') as source:
+            while block := source.read(1024 * 1024):
+                result.update(block)
+        result.update(b'\0')
+    return result.hexdigest()
+
+
+def go_inputs(source):
+    settings = json.loads(run('go', 'env', '-json', 'GOVERSION', 'GOOS', 'GOARCH', 'CGO_ENABLED', 'GOFLAGS', 'GOTOOLCHAIN', 'GOWORK', 'GOENV', cwd=source))
+    if settings['GOWORK'] not in ('', 'off'):
+        raise ValueError('Go workspace inputs are external')
+    if settings['GOENV'] != 'off' and Path(settings['GOENV']).exists():
+        settings['configDigest'] = file_digest([Path(settings['GOENV'])])
+    raw = run('go', 'list', '-mod=readonly', '-m', '-json', 'all', cwd=source)
+    decoder = json.JSONDecoder()
+    while raw.strip():
+        module, end = decoder.raw_decode(raw.lstrip())
+        raw = raw.lstrip()[end:]
+        replacement = module.get('Replace', {})
+        if replacement and not replacement.get('Version'):
+            raise ValueError('local Go replacements are external')
+    return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
+
+
+def gradle_user_inputs(home):
+    files = [home / name for name in ('gradle.properties', 'init.gradle', 'init.gradle.kts') if (home / name).exists()]
+    files += [path for path in (home / 'init.d').rglob('*') if path.is_file()]
+    if any(path.is_symlink() for path in files):
+        raise ValueError('Gradle user inputs use external symlinks')
+    return file_digest(files)
+
+
+def requirements_inputs(product):
+    branch = run('git', 'branch', '--show-current', cwd=product)
+    match = re.fullmatch(r'feature/(\d+)', branch)
+    if match is None:
+        raise ValueError('pre-verify ticket context is unavailable')
+    ticket = int(match[1])
+    base = None
+    for reference in ('origin/main', 'main'):
+        try:
+            base = run('git', 'merge-base', 'HEAD', reference, cwd=product)
+            break
+        except subprocess.CalledProcessError:
+            continue
+    if not base:
+        raise ValueError('pre-verify merge base is unavailable')
+    # Use the same supported read-only endpoints as pre-verify. Each lookup is
+    # bounded so both fit inside the dispatcher's 15-second input-hook budget.
+    issue = json.loads(subprocess.check_output(
+        ['gh', 'issue', 'view', str(ticket), '--repo', 'pyrycode/pyrycode-mobile', '--json', 'labels'],
+        cwd=product, stderr=subprocess.PIPE, timeout=3))
+    prs = json.loads(subprocess.check_output(
+        ['gh', 'pr', 'list', '--repo', 'pyrycode/pyrycode-mobile', '--head', branch, '--state', 'open',
+         '--json', 'number,body', '--limit', '1'], cwd=product, stderr=subprocess.PIPE, timeout=3))
+    labels = issue.get('labels') if isinstance(issue, dict) else None
+    if not isinstance(labels, list) or any(not isinstance(label, dict) or not isinstance(label.get('name'), str) for label in labels):
+        raise ValueError('pre-verify labels are unavailable')
+    if not isinstance(prs, list) or len(prs) > 1:
+        raise ValueError('pre-verify pull request metadata is unavailable')
+    for pr in prs:
+        if not isinstance(pr, dict) or not isinstance(pr.get('number'), int) or 'body' not in pr or pr['body'] is not None and not isinstance(pr['body'], str):
+            raise ValueError('pre-verify pull request metadata is incomplete')
+    # An empty list is an explicit successful no-open-PR lookup, not a failure.
+    data = {'ticket': ticket, 'mergeBase': base, 'labels': sorted(label['name'] for label in labels), 'pullRequests': prs}
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
+def snapshot(root, product):
+    result = {'agentsTree': checkout_tree(root), 'dispatcherTree': checkout_tree(root / 'dispatcher')}
+    result['preVerifyRequirements'] = requirements_inputs(product)
+    result['python'] = file_digest([Path(sys.executable)])
+    result['pythonVersion'] = sys.version
+    managed = root / 'scripts/gradle-gate.py'
+    policy = runpy.run_path(str(managed))
+    jdk, cli, agent = policy['installation'](product, os.environ)
+    result['java'] = file_digest([jdk / 'bin/java', jdk / 'release'])
+    java_version = subprocess.check_output([str(jdk / 'bin/java'), '-version'], stderr=subprocess.STDOUT, timeout=20)
+    result['javaVersion'] = hashlib.sha256(java_version).hexdigest()
+    result['gradle'] = file_digest([managed, cli, agent, product / 'gradle/wrapper/gradle-wrapper.properties'])
+    result['gradleUserInputs'] = gradle_user_inputs(Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle'))))
+    sdk = Path(os.environ['ANDROID_HOME']).resolve()
+    manifests = [path for path in sdk.rglob('*') if path.is_file() and path.name in ('package.xml', 'source.properties')]
+    if not manifests:
+        raise ValueError('Android SDK package manifests are unavailable')
+    sdk_files = manifests + [sdk / 'platform-tools/adb', sdk / 'emulator/emulator']
+    sdk_files += [path for path in (sdk / 'licenses').glob('*') if path.is_file()]
+    result['android'] = file_digest(sdk_files)
+    for binary, variable, sibling in [('PYRY_BIN', 'PYRYCODE_SRC', 'pyrycode'), ('RELAY_BIN', 'PYRYCODE_RELAY_SRC', 'pyrycode-relay')]:
+        if os.environ.get(binary):
+            result[binary] = file_digest([Path(os.environ[binary])])
+        else:
+            source = Path(os.environ.get(variable, str(root.parent / sibling))).resolve()
+            result[variable] = {'tree': checkout_tree(source), 'go': go_inputs(source)}
+    for variable in ('FAKE_CLAUDE_BIN',):
+        if os.environ.get(variable):
+            result[variable] = file_digest([Path(os.environ[variable])])
+    go = shutil.which('go')
+    if go is None:
+        raise ValueError('Go toolchain is unavailable')
+    result['goExecutable'] = file_digest([Path(go)])
+    return result
+
+
+def main():
+    try:
+        root = Path(__file__).resolve().parents[1]
+        print(json.dumps(snapshot(root, Path.cwd()), sort_keys=True))
+    except (KeyError, OSError, ValueError, subprocess.SubprocessError):
+        print('Mobile external gate inputs are unavailable or changed locally; retained gate reuse disabled.', file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
