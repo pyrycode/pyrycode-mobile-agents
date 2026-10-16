@@ -100,3 +100,13 @@ budget, not Claude's turn budget, and never enters Claude's continuation path.
 The launch still processes the board; it is not a single-ticket mode.
 See [the dispatcher runner documentation](../dispatcher/README.md#selectable-agent-runner)
 for the result contract, limitations and verification.
+
+## Captured client checks
+
+`pyry-start` disables automatic real-Claude execution and label parking after
+`op run` injects saved settings. This requires dispatcher revision `097d6c9` or
+later. Restart uses the same launcher. Stale environment settings cannot restore
+the old gate. The ordinary UI gate already includes captured client scenarios.
+The explicit live command remains available for recording refresh and acceptance
+that needs real delivery, encryption, transport or current producer behaviour.
+Required evidence must be supplied before verifier PASS.

@@ -62,12 +62,15 @@ args=sys.argv[1:]
 command=args[args.index('--')+1:]
 # Simulate op run: saved .env values replace the parent environment.
 os.environ['PYRY_AGENT_RUNNER']=os.environ['TEST_SAVED_RUNNER']
+# Saved settings may still enable the retired live gate.
+os.environ['PYRY_REAL_CLAUDE_GATE_ENABLED']='1'
+os.environ['PYRY_REAL_CLAUDE_GATE_CMD']='stale-saved-live-command'
 os.execv(command[0],command)
 ''',
                 "node": '''#!/usr/bin/env python3
 import json,os,sys
 from pathlib import Path
-Path(os.environ['TEST_ROOT'],'result').write_text(json.dumps({'managed':os.environ.get('PYRY_MANAGED'),'runner':os.environ.get('PYRY_AGENT_RUNNER'),'args':sys.argv[1:],'service_token_present':'OP_SERVICE_ACCOUNT_TOKEN' in os.environ}))
+Path(os.environ['TEST_ROOT'],'result').write_text(json.dumps({'managed':os.environ.get('PYRY_MANAGED'),'runner':os.environ.get('PYRY_AGENT_RUNNER'),'args':sys.argv[1:],'service_token_present':'OP_SERVICE_ACCOUNT_TOKEN' in os.environ,'live_enabled':os.environ.get('PYRY_REAL_CLAUDE_GATE_ENABLED'),'live_command':os.environ.get('PYRY_REAL_CLAUDE_GATE_CMD')}))
 ''',
                 "pgrep": "#!/bin/sh\nexit 1\n",
                 "sleep": "#!/bin/sh\nexit 0\n",
@@ -87,6 +90,15 @@ Path(os.environ['TEST_ROOT'],'result').write_text(json.dumps({'managed':os.envir
                                  stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
             result = json.loads((root / "result").read_text()) if (root / "result").exists() else None
             return run, result, (root / "install").exists()
+
+    def test_saved_live_gate_cannot_reenable_routing_after_start_or_restart(self):
+        for entry in ["pyry-start", "pyry-restart"]:
+            for args in [[], ["--managed"], ["--runner", "claude"], ["--runner", "codex"]]:
+                with self.subTest(entry=entry, args=args):
+                    run, result, _ = self.launch(args, entry=entry)
+                    self.assertEqual(run.returncode, 0, run.stderr)
+                    self.assertEqual(result["live_enabled"], "0")
+                    self.assertEqual(result["live_command"], "")
 
     def test_managed_mode_is_consumed_and_preserved_by_restart(self):
         for entry in ["pyry-start", "pyry-restart"]:

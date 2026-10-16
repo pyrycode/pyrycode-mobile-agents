@@ -201,18 +201,12 @@ The first three are mandatory before PR. The dispatcher owns the routine device 
 
 Scope `./gradlew test` to the classes you touched — enough to prove your own change. **Do NOT run the whole-project `./gradlew test` (or `./gradlew check`) as a capstone.** That full unit-suite regression is **QA's gate, not yours**: QA runs `./gradlew check` next with a deterministic baseline comparison, so running it yourself duplicates that stage and can exceed your wall-clock budget (the same failure mode as the pyrycode #1066 developer timeout — finish the work, then blow the wall on the final full suite).
 
-### 4a. Real-claude e2e — part of the definition of done (operator-facing features)
+### 4a. Recorded client checks and explicit live evidence
 
-**If this ticket ships an operator-facing happy-path flow — anything the operator will exercise live on the phone (a reply rendering, a tool step, a permission prompt, a session boundary, an action button that now talks to the daemon) — its definition of done includes a rung-3 real-Claude e2e scenario.** The dispatcher runs scripted UI scenarios before verifier and the tagged live suite after verifier, so the pipeline records real-stack evidence before documentation and merge.
+An operator-facing flow needs a captured scenario or focused native test that proves its acceptance. The ordinary UI gate includes captured Claude client scenarios without starting Claude or a daemon. Reuse genuine app messages and original assertions. Follow `docs/recorded-tests.md` for new captures and recording refreshes; do not hand-author substitutes for current producer behaviour.
 
-Concretely:
+Automatic real-Claude routing is retired. Do not add `needs-real-claude` or expect a post-review live run. Preserve explicit acceptance for current provider or daemon behaviour, actual notification delivery, encryption, transport recovery and timing. Supply counted evidence, source identities and retained raw captures before review PASS, or report the exact operator blocker. An expressly authorised later manual stage needs an operator hold. `builder/device-tests.md` and the shared practice describe focused commands and evidence retention.
 
-- **Add the scenario to the shipped rung-3 harness — `InteractiveStreamE2ETest`** (the #421 / #431 emulator + host-daemon + real-claude rig). Either land it with the feature, or split it into its own follow-up ticket in the **#481 / #482 shape** — one `@Test` scenario, sized S, `@Ignore`-gated if its signal is transient and cannot be made durable (the #482 thinking-spinner precedent).
-- **Where a scripted fixture can hold the turn/state open, also add a deterministic rung-4 twin** in `DeterministicInteractiveStreamE2ETest` (`DETERMINISTIC=1`, scripted `fakeclaude`, zero claude turns) so the flow has a re-runnable check beside the semi-deterministic real-claude one. If the state is transient with no durable artifact and no way to hold it open, the real-claude scenario stands alone (again, the #482 case).
-- **You are NOT required to RUN the real-Claude suite.** It uses a managed emulator, a host daemon and the live relay, and runs after verifier only for `needs-real-claude` tickets through `python3 scripts/android-test-gate.py live`. Your obligation is that the scenario EXISTS and is wired on the harness. Add a deterministic twin when the fixture can hold the state open; triage any dispatcher result supplied for your change.
-- **The ladder doc `docs/e2e-interactive-stream.md` is the source of truth** for the rung vocabulary, the harness seams, and how the suite runs. Read it before adding a scenario, and reference it rather than duplicating its content.
-
-For a data-layer, refactor, or other non-operator-facing ticket, this section does not fire — there is no live phone flow to prove.
 
 ### 5. Commit and PR
 - Commit to the feature branch (`feature/<issue-number>`)

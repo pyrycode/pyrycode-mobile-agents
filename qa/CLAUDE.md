@@ -73,16 +73,15 @@ Run **both** every time. `check` catches unit-test, Android-lint, and format (sp
 
 **androidTest gap:** `./gradlew check` does NOT compile the `androidTest` source set. If the PR touches `app/src/androidTest/`, also run `./gradlew compileDebugAndroidTestKotlin` and treat its failure as a build failure (route to `needs-rework:developer`). This closes the gap that let a broken `androidTest` import ship on `main` (see the code-review gradle-task-list note).
 
-## Real-claude e2e — NOT your gate
+## Recorded client checks and explicit live evidence
 
-The rung-3 real-Claude e2e suite (`InteractiveStreamE2ETest`, driven by
-`scripts/e2e-emulator.sh`) is not a QA command. The dispatcher runs routine
-managed-device UI and scripted scenarios before verifier, and runs
-`python3 scripts/android-test-gate.py live` after verifier for `needs-real-claude`
-tickets. Consume the command and XML evidence supplied to the role and triage
-failures; do not manually boot an emulator or add the live suite to `./gradlew check`.
-Compiling the `androidTest` set per the gap note above remains yours when the role
-touches that source set.
+The dispatcher runs managed-device UI checks, including captured Claude client
+scenarios, and scripted scenarios before verifier. These use zero Claude turns.
+Automatic post-verifier real-Claude routing is retired; do not add or restore
+`needs-real-claude`. Consume counted evidence and triage failures. Explicit live
+requirements need their own counted evidence before review PASS or the existing
+operator-blocker route. Do not manually boot an emulator or add the live suite to
+`./gradlew check`. Compile the `androidTest` set when the role touches it.
 
 ## Classification
 

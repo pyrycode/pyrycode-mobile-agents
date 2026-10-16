@@ -166,25 +166,19 @@ Labels are the contract between stages; prose in the body is for people. Set eac
 
 The internet-exposed surfaces are the Noise handshake, the relay socket, token and pairing handling, and frame decoding under `data/network/` and `data/crypto/`. A new inbound verb that carries daemon-authored text into Compose counts too, because that text is rendered. When in doubt, apply it. Pure-function helpers, refactors with no behaviour change and documentation updates do not need it.
 
-**`needs-real-claude`** schedules the dispatcher's live gate. Routine UI and scripted scenarios run before the verifier with zero real Claude turns. A labelled ticket that passes verification then runs `python3 scripts/android-test-gate.py live` before documentation and merge, and a missing, zero-count or failed live result cannot pass. The verifier adds the label if you missed it, but setting it here keeps the criteria explicit. The ladder doc `docs/e2e-interactive-stream.md` in the target repository defines the rung vocabulary and how the suite runs.
+**Recorded client checks and explicit live requirements.** `needs-real-claude` is retired. Do not apply it. The normal UI gate already runs captured Claude client scenarios, including permissions, streaming, interruption, session boundaries and settings. Routine client behaviour needs an affected recorded scenario or a focused native test, not a real-Claude turn.
 
-Apply it when acceptance can only be proven against a real Claude behind a real pyry daemon over the live relay, which means the criteria name any of:
+When acceptance requires current Claude or daemon behaviour, refreshing recordings, actual notification delivery, encryption, transport recovery or timing, state the exact live observation, who obtains it, and the counted evidence required before verifier PASS. Explicit live commands remain available through `python3 scripts/android-test-gate.py live` and the product's `docs/recorded-tests.md` runbook. No post-verifier automatic live run will supply missing evidence. If later manual acceptance is expressly authorised, require an operator hold before handoff.
 
-- a rung-3 real-Claude scenario on `InteractiveStreamE2ETest`, `scripts/e2e-emulator.sh` with `LIVE=1`, or `scripts/e2e-preship-gate.sh`;
-- behaviour only a live Claude exercises: a permission or trust prompt round-trip, reply streaming into the thread, an interrupt or queue-drop against a real turn, a session boundary, or a settings round-trip the daemon echoes back;
-- "verify live", "against a real claude", "on the emulator against the real daemon", "on the operator machine", or anything else that neither `./gradlew test` nor the deterministic rung-4 twin covers.
-
-When in doubt, apply it; a missing label lets a live requirement skip the gate.
-
-Write live criteria so a fresh passing result for the named method in the full live suite satisfies them. Ask for executed, failed and skipped counts and for confirmation that the named method ran and passed; an exit code or total alone is not enough. The gate runs only the full suite and never reads a focused command from a ticket, so ask for a separate focused run only when isolation or a different setup proves something the full suite cannot, and then say why and who obtains the evidence before documentation. Documentation records evidence; it never produces it.
+A required named method must execute and pass. Ask for executed, failed and skipped counts, source revisions and retained raw evidence. Documentation records evidence; it never produces it. Keep compatibility checks strict and distinguish reviewed differences from a successful comparison.
 
 Criteria about dispatcher-run checks ask for outcomes, not commands. Name the gate and the evidence wanted, for example that the named method ran and passed in the UI gate with executed, failed and skipped counts. Never name an environment variable, flag or command line for the dispatcher to use, unless it already appears in that gate's configured command. No agent can change how a gate is invoked, so such a criterion parks a ticket whose work passed, as #1797's `UI_GATE_FULL=1` did on 2026-10-05. The gates as configured in `.env`:
 
 - **Verifier gates,** before the verifier, in order: `python3 scripts/pre-verify.py`, `scripts/docs-guard.sh`, `python3 -m unittest discover -s scripts`, `./gradlew check`, `./gradlew assembleDebug`, `./gradlew compileDebugAndroidTestKotlin`, the UI gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py ui` and the scripted gate `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py scripted-all`.
-- **Live gate,** after the verifier on a `needs-real-claude` ticket: `ANDROID_GATE_WAIT_SECONDS=2700 python3 scripts/android-test-gate.py live`.
+- **Explicit live checks:** builder or operator supplies required live evidence before verifier PASS. These are not automatic dispatcher gates.
 - **Main sweep:** `UI_GATE_FULL=1 UI_DEVICE_ALL=1 python3 scripts/android-test-gate.py ui`. It runs against main between tickets, never on a ticket's branch, so no criterion can ask for it.
 
-When the flow is operator-facing, such as a reply rendering, a tool step, a permission prompt, a session boundary or an action button that now talks to the daemon, add one criterion naming the rung-3 scenario the ticket lands or the follow-up ticket it spawns, in the shape of #481 and #482. Data-layer, refactor and non-operator-facing tickets do not need one.
+For an operator-facing flow, name the recorded scenario or focused native test that proves the client behaviour. New behaviour that is absent from existing recordings needs a genuine capture and replay, following `docs/recorded-tests.md`. Add an explicit live requirement only for behaviour the recorded and scripted checks cannot prove.
 
 ## Sizing Guide
 

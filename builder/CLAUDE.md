@@ -60,7 +60,7 @@ Documentation requirements belong to the documentation stage, which runs after t
 
 ## Labels and outcomes
 
-The dispatcher reads GitHub labels and, under Codex, your structured outcome. It never reads your comments or PR body for routing. The one PR body section it reads is `## Live tests`, which chooses what the live gate runs, not where the ticket goes. A comment that says "this needs a split" without the label or outcome lets the ticket advance anyway.
+The dispatcher reads GitHub labels and, under Codex, your structured outcome. It never reads your comments or PR body for routing. The retired `## Live tests` routing does not schedule a run. Explicit live evidence is reviewed against the ticket before verifier PASS. A comment that says "this needs a split" without the label or outcome lets the ticket advance anyway.
 
 | Situation | On Claude | On Codex |
 |---|---|---|
@@ -220,7 +220,7 @@ Write the failing test first and watch it fail for the right reason, then write 
 - **Device-only tests** under `app/src/androidTest/` are for what Robolectric cannot give: a real input method or device shell, real pixels saved as screenshots, the Keystore or real on-device storage, or work on a background dispatcher the paused main clock does not drive. Each one costs every later verifier pass emulator time, so state the device-only reason in the plan's Testing strategy. Read `device-tests.md` before writing one.
 - **Fakes over mocks** at the repository and data layer, in the `FakeConversationRepository` shape. Use MockK only for ViewModels that need fine-grained interaction checks.
 
-An operator-facing happy-path flow is done only with its real-Claude scenario. That means anything the operator exercises live on the phone: a reply rendering, a tool step, a permission prompt, a session boundary, or an action button that now talks to the daemon. Either land a rung-3 scenario on `InteractiveStreamE2ETest` with the feature, or file a follow-up ticket in the #481 and #482 shape: one `@Test` scenario, sized small, `@Ignore`-gated if its signal is transient. Add the rung-4 deterministic twin where a scripted fixture can hold the state open. `device-tests.md` has the harness detail. The verifier fails an operator-facing flow that has neither. Data-layer, refactor and other non-operator-facing tickets do not need one.
+An operator-facing flow needs a recorded scenario or focused native test that proves its acceptance. Reuse the captured message boundary and original assertions. New behaviour absent from existing recordings needs genuine capture and replay under `docs/recorded-tests.md`. Add scripted checks where holding a state open improves coverage. Real delivery, encryption, transport, timing and current producer behaviour remain explicit live obligations when the ticket requires them. `device-tests.md` describes the evidence required before verifier PASS.
 
 ### Invariant probes: a trial on ordering tickets
 
@@ -295,10 +295,10 @@ One paragraph: what changed and why.
 Closes #<ticket>
 
 ## Testing
-The focused commands that ran and their results. Device or scripted evidence where device-tests.md asks for it. For visual changes, the existing tests that ran and any justified expectation change. The rung-3 scenario landed, or the follow-up ticket. Ignored assertions with their bug ticket. Figma deviations you could not reconcile.
+The focused commands that ran and their results. Device or scripted evidence where device-tests.md asks for it. For visual changes, the existing tests that ran and any justified expectation change. The recorded scenario or focused native coverage, and any explicitly required live evidence. Ignored assertions with their bug ticket. Figma deviations you could not reconcile.
 
 ## Live tests
-Only on a `needs-real-claude` ticket. The live methods the gate should run, one qualified name per line, as `device-tests.md` describes. Omit on other tickets.
+Only when the ticket explicitly requires live evidence. List the methods actually run, one qualified name per line, and retain commands, counted results, source revisions and durable evidence paths in Testing. This section does not schedule a dispatcher gate. Omit on routine recorded-test tickets. See `device-tests.md`.
 
 ## Documentation handoff
 Pending items for the documentation stage, with path and section. Omit when the ticket has none.
@@ -322,6 +322,6 @@ When the ticket comes back with `needs-rework:builder`, read the verifier's verd
 - **From triage of a red gate,** the verdict separates regressions this PR caused from pre-existing failures. Fix the regressions in your diff. Rerun each named regression with its focused command until it passes — `./gradlew testDebugUnitTest --tests "<class>"` for a shared test — and paste the test names with their executed and passed counts into the PR; zero executed is not a pass. The verifier has already filed or linked tickets for pre-existing failures; fixing them here is out of scope. For an inherited lint failure on unchanged code, follow `handoffs.md`.
 - **From review,** fix every MUST FIX and address the SHOULD FIX findings. Three or more left unfixed fails the next review. If a finding names a gap in the plan's security review, revise that section and record the change under `## Revisions` rather than patching code under an unaudited design.
 - **A device or scripted failure** names its method or scenario. Reproduce it with the focused command in `device-tests.md` and rerun it after the repair.
-- **A live failure** names a real-Claude method. After the repair, run that method through `python3 scripts/android-test-gate.py live --tests "<Class#method>"`, as `device-tests.md` describes. Paste the executed and passed counts, the selected method and the fresh evidence path into the PR and final handoff. A zero-test run or an environment error is not a pass. The full live suite remains dispatcher work. Never print a secret or the environment.
+- **A live failure** names a real-Claude method. After the repair, run that method through `python3 scripts/android-test-gate.py live --tests "<Class#method>"`, as `device-tests.md` describes. Paste the executed and passed counts, the selected method and the fresh evidence path into the PR and final handoff. A zero-test run or an environment error is not a pass. Run the full live suite only when the explicit acceptance requires it; no automatic later live gate supplies missing evidence. Never print a secret or the environment.
 
 Fix on the existing branch; the plan and code are already there, though the fresh worktree makes the first Gradle call cold again. Never rewrite the plan to match the code. When a finding changes the design, append a dated `## Revisions` entry: what changed, which finding drove it and the new contract. Then re-run the focused checks for the scope you touched and the final checks after the last merge of main, commit and push. The updated PR goes through the full gates and review again.
