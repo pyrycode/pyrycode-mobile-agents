@@ -1,0 +1,76 @@
+"""Fresh named JVM evidence without a device, Gradle install or account."""
+import contextlib
+import importlib.util
+import io
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+spec = importlib.util.spec_from_file_location('jvm_gate', Path(__file__).with_name('jvm-test-gate.py'))
+gate = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(gate)
+CASE = 'de.pyryco.mobile.ExampleTest#works'
+
+
+class JvmGateTests(unittest.TestCase):
+    def run_gate(self, xml=None, code=0, tests=None, stale=False):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / 'app/build/test-results/testDebugUnitTest'
+            reports.mkdir(parents=True)
+            def execute(command, **kwargs):
+                if xml is not None:
+                    path = reports / 'TEST-example.xml'
+                    path.write_text(xml)
+                    if stale:
+                        os.utime(path, ns=(1, 1))
+                self.command = command
+                self.assertIs(kwargs['stdout'], gate.sys.stderr)
+                return subprocess.CompletedProcess(command, code)
+            output = io.StringIO()
+            with patch.object(gate, 'ROOT', root), patch.object(gate.subprocess, 'run', side_effect=execute), \
+                 patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                status = gate.run(tests)
+            return status, output.getvalue()
+
+    def test_only_named_methods_are_rerun_and_reported(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works" time="0.1"/></testsuite>'
+        status, output = self.run_gate(xml, tests=[CASE])
+        self.assertEqual(status, 0)
+        self.assertEqual(self.command[1:5], [':app:testDebugUnitTest', '--rerun', '--console=plain', '--tests'])
+        self.assertEqual(self.command[-1], 'de.pyryco.mobile.ExampleTest.works')
+        self.assertIn('name="works"', output)
+
+    def test_stale_empty_missing_and_truncated_reports_cannot_pass(self):
+        valid = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        for xml, stale in [(None, False), ('<testsuite tests="0"/>', False), ('<testsuite>', False), (valid, True),
+                           (valid.replace('tests="1"', 'tests="2"'), False)]:
+            with self.subTest(xml=xml, stale=stale):
+                self.assertNotEqual(self.run_gate(xml, stale=stale)[0], 0)
+
+    def test_failed_or_skipped_named_method_cannot_be_hidden_by_other_pass(self):
+        for child in ['<failure message="broken"/>', '<skipped/>']:
+            xml = '<testsuite tests="2"><testcase classname="de.pyryco.mobile.ExampleTest" name="works">' + child + '</testcase><testcase classname="de.pyryco.mobile.ExampleTest" name="other"/></testsuite>'
+            self.assertNotEqual(self.run_gate(xml, tests=[CASE])[0], 0)
+
+    def test_nonzero_build_is_preserved_even_with_passing_xml(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        self.assertEqual(self.run_gate(xml, code=17)[0], 17)
+
+    def test_suite_error_without_named_failure_stays_red(self):
+        xml = '<testsuite tests="1" errors="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        self.assertNotEqual(self.run_gate(xml)[0], 0)
+
+    def test_selector_is_exact_and_never_shell_or_gradle_option(self):
+        self.assertEqual(gate.parse_tests(CASE + ',' + CASE), [CASE])
+        for value in ['', '--tests', 'Other#method', CASE + ';touch /tmp/x', CASE + ',']:
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    gate.parse_tests(value)
+
+
+if __name__ == '__main__':
+    unittest.main()

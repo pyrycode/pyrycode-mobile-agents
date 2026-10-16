@@ -1,5 +1,14 @@
 # Mobile workflow sync
 
+## Named verifier comparisons, 2026-10-17
+
+Static, JVM, assembly and device gates retain separate evidence. JVM execution
+emits fresh JUnit XML. JVM, UI and scripted failures have exact named baseline
+commands, so comparison does not repeat every passing test. Normal UI and
+scripted selections retain their complete coverage. See
+[verifier throughput](verifier-throughput.md) for measured costs, configuration
+and evidence requirements. Source-review overlap was already enabled.
+
 ## Captured client checks, 2026-10-16
 
 Mobile product PR 2195 promoted 71 captured scenarios into the normal device gate.

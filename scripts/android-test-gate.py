@@ -608,7 +608,30 @@ def raise_interrupt(*_):
     raise KeyboardInterrupt
 
 
-def run_scripted_all(env, run_dir, device):
+def scripted_selection(value):
+    """Resolve exact methods through the harness's literal scenario declarations."""
+    prefix = E2E_PACKAGE + '.DeterministicInteractiveStreamE2ETest#'
+    names = value.split(',')
+    if len(value) > 8192 or len(names) > 64 or any(not re.fullmatch(re.escape(prefix) + r'[A-Za-z_][A-Za-z0-9_]*', name) for name in names):
+        raise ValueError('--tests requires exact scripted Class#method names')
+    try:
+        source = (ROOT / 'scripts/e2e-emulator.sh').read_text()
+    except OSError as error:
+        raise ValueError('scripted scenario declarations are unavailable') from error
+    mappings = {}
+    for scenario, body in re.findall(r'^    ([a-z][a-z-]*)\)\n(.*?)^      ;;', source, re.MULTILINE | re.DOTALL):
+        methods = re.findall(r'^      TEST_METHOD="([A-Za-z_][A-Za-z0-9_]*)"$', body, re.MULTILINE)
+        if scenario in SCENARIOS and len(methods) == 1:
+            name = prefix + methods[0]
+            if name in mappings:
+                raise ValueError('scripted method has ambiguous scenario declarations')
+            mappings[name] = scenario
+    if any(name not in mappings for name in names):
+        raise ValueError('selected method is not a supported scripted scenario')
+    return [(mappings[name], name) for name in dict.fromkeys(names)]
+
+
+def run_scripted_all(env, run_dir, device, selection=None):
     """Run every scripted scenario, on one self-booted emulator when the AVD exists. Returns the exit code."""
     expected_class = E2E_PACKAGE + ".DeterministicInteractiveStreamE2ETest"
     avd = managed_avd(device) if env.get("ANDROID_HOME") else None
@@ -630,7 +653,8 @@ def run_scripted_all(env, run_dir, device):
         if serial and granted is None:
             print("Android gate: scripted-all could not install the APKs once; each scenario installs its own",
                   file=sys.stderr)
-        for scenario in SCENARIOS:
+        scenarios = [scenario for scenario, _ in selection] if selection is not None else SCENARIOS
+        for scenario in scenarios:
             scenario_env = {**env, "DETERMINISTIC": "1", "SCENARIO": scenario, "DEVICE": target}
             if serial:
                 scenario_env["ANDROID_SERIAL"] = serial
@@ -646,7 +670,9 @@ def run_scripted_all(env, run_dir, device):
                                               scenario_env, directory, started, run_dir, f"{scenario}-")
             all_paths.extend(paths)
             try:
-                _, passed, executed = combine_reports(paths, expected_class)
+                scenario_xml, passed, executed = combine_reports(paths, expected_class)
+                if selection is not None:
+                    require_selected_tests(scenario_xml, [name for selected, name in selection if selected == scenario])
             except ValueError as error:
                 passed, executed = False, 0
                 print(f"Android gate: scripted {scenario}: {error}", file=sys.stderr)
@@ -664,9 +690,9 @@ def run_scripted_all(env, run_dir, device):
     (run_dir / "dispatcher.xml").write_text(xml + "\n")
     print(xml)
     print(f"Android gate: scripted-all {executed} executed; failed: {', '.join(failed) or 'none'}", file=sys.stderr)
-    if executed < len(SCENARIOS):
+    if executed < len(scenarios):
         print(f"Android gate failed: Only {executed} Android tests executed; "
-              f"required at least {len(SCENARIOS)}", file=sys.stderr)
+              f"required at least {len(scenarios)}", file=sys.stderr)
         return 1
     return 1 if failed else 0
 
@@ -675,12 +701,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("ui", "scripted", "scripted-all", "live"))
     parser.add_argument("scenario", nargs="?", choices=SCENARIOS)
-    parser.add_argument("--tests", help="ui: comma-separated package.Class or Class#method selectors; live: curated Class#method subset")
+    parser.add_argument("--tests", help="ui: package.Class or Class#method; scripted-all and live: exact Class#method subset")
     args = parser.parse_args()
     if (args.mode == "scripted") != (args.scenario is not None):
         parser.error("scripted requires one scenario; ui and live take no scenario")
     live_tests = None
     ui_tests = None
+    scripted_tests = None
     if args.tests is not None:
         if args.mode == 'ui':
             ui_tests=parse_ui_tests(args.tests)
@@ -688,7 +715,10 @@ def main():
         elif args.mode == 'live':
             live_tests = parse_live_tests(args.tests)
             if live_tests is None:parser.error(f"--tests must be a comma-separated list of {LIVE_CLASS}#method names")
-        else:parser.error('--tests applies to ui or live only')
+        elif args.mode == 'scripted-all':
+            try:scripted_tests = scripted_selection(args.tests)
+            except ValueError as error:parser.error(str(error))
+        else:parser.error('--tests applies to ui, scripted-all or live only')
     device = os.environ.get("DEVICE", "pixel2Api33Atd")
     if not device.isalnum():
         parser.error("DEVICE must be an alphanumeric Gradle device name")
@@ -821,6 +851,8 @@ def main():
             print(f"Android gate: {args.mode} {args.scenario or ''}; artifacts: {run_dir}", file=sys.stderr)
             phase('device-command-started')
             if args.mode == "scripted-all":
+                if scripted_tests is not None:
+                    return run_scripted_all(env, run_dir, device, scripted_tests)
                 return run_scripted_all(env, run_dir, device)
             run = run_live_on_device if args.mode == "live" else run_on_device
             return run(command, env, run_dir, device, minimum, expected_class)
