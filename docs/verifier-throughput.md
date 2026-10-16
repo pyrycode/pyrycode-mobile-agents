@@ -72,6 +72,17 @@ and unchanged ordered gate list. It preserves original failure artifacts.
 Changed source, commands or provenance invalidate reuse. This requires the
 consumer's shared-dispatcher revision to include that feature.
 
+Set `PYRY_VERIFIER_GATE_INPUTS_CMD` to the checked-in `bin/verifier-inputs`
+command from `.env.example`. Its snapshot binds the clean agents and dispatcher
+trees, configured daemon and relay sources or explicit test binaries, Python and
+Go identity, Java release and executable, installed Gradle launcher, Android
+package and licence manifests, and adb and emulator executables. Local Go
+workspaces and unversioned replacements disable reuse. The shared dispatcher also
+binds the scrubbed gate environment, ordered commands, product tree and log-byte
+hashes. Dirty, missing or unknown external inputs disable both retained-prefix
+and full-pass reuse. The snapshot is checked again before retained evidence can
+be written. Helper or settings changes cannot reuse the old product-only pass.
+
 ## Host admission and command lifetime
 
 All configured Gradle gates and documented focused builder commands acquire

@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Describe external Mobile gate inputs without printing environment values."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+
+def run(*args, cwd=None):
+    return subprocess.check_output(args, cwd=cwd, stderr=subprocess.PIPE, timeout=20).decode().strip()
+
+
+def checkout_tree(path):
+    path = path.resolve()
+    if Path(run('git', '-C', str(path), 'rev-parse', '--show-toplevel')).resolve() != path:
+        raise ValueError('external tooling checkout is uninitialized')
+    if run('git', '-C', str(path), 'status', '--porcelain', '--untracked-files=no'):
+        raise ValueError('external tooling checkout has local changes')
+    return run('git', '-C', str(path), 'rev-parse', 'HEAD^{tree}')
+
+
+def file_digest(paths):
+    result = hashlib.sha256()
+    for path in sorted(set(paths)):
+        result.update(str(path.resolve()).encode())
+        result.update(b'\0')
+        with path.open('rb') as source:
+            while block := source.read(1024 * 1024):
+                result.update(block)
+        result.update(b'\0')
+    return result.hexdigest()
+
+
+def go_inputs(source):
+    settings = json.loads(run('go', 'env', '-json', 'GOVERSION', 'GOOS', 'GOARCH', 'CGO_ENABLED', 'GOFLAGS', 'GOTOOLCHAIN', 'GOWORK', 'GOENV', cwd=source))
+    if settings['GOWORK'] not in ('', 'off'):
+        raise ValueError('Go workspace inputs are external')
+    if settings['GOENV'] != 'off' and Path(settings['GOENV']).exists():
+        settings['configDigest'] = file_digest([Path(settings['GOENV'])])
+    raw = run('go', 'list', '-m', '-json', 'all', cwd=source)
+    decoder = json.JSONDecoder()
+    while raw.strip():
+        module, end = decoder.raw_decode(raw.lstrip())
+        raw = raw.lstrip()[end:]
+        replacement = module.get('Replace', {})
+        if replacement and not replacement.get('Version'):
+            raise ValueError('local Go replacements are external')
+    return hashlib.sha256(json.dumps(settings, sort_keys=True).encode()).hexdigest()
+
+
+def snapshot(root, product):
+    result = {'agentsTree': checkout_tree(root), 'dispatcherTree': checkout_tree(root / 'dispatcher')}
+    result['python'] = file_digest([Path(sys.executable)])
+    result['pythonVersion'] = sys.version
+    jdk = Path(os.environ['JAVA_HOME']).resolve()
+    result['java'] = file_digest([jdk / 'bin/java', jdk / 'release'])
+    java_version = subprocess.check_output([str(jdk / 'bin/java'), '-version'], stderr=subprocess.STDOUT, timeout=20)
+    result['javaVersion'] = hashlib.sha256(java_version).hexdigest()
+    wrapper = product / 'gradle/wrapper/gradle-wrapper.properties'
+    distribution = re.search(r'gradle-([^/]+)-(bin|all)\.zip', wrapper.read_text())
+    if distribution is None:
+        raise ValueError('Gradle distribution is unknown')
+    cache = Path(os.environ.get('GRADLE_USER_HOME', str(Path.home() / '.gradle')))
+    homes = sorted((cache / 'wrapper/dists' / f'gradle-{distribution[1]}-{distribution[2]}').glob(f'*/gradle-{distribution[1]}'))
+    if not homes:
+        raise ValueError('Gradle distribution has not been installed')
+    gradle_files = [wrapper]
+    for home in homes:
+        gradle_files += [home / 'bin/gradle', home / f'lib/gradle-launcher-{distribution[1]}.jar']
+    result['gradle'] = file_digest(gradle_files)
+    sdk = Path(os.environ['ANDROID_HOME']).resolve()
+    manifests = [path for path in sdk.rglob('*') if path.is_file() and path.name in ('package.xml', 'source.properties')]
+    if not manifests:
+        raise ValueError('Android SDK package manifests are unavailable')
+    sdk_files = manifests + [sdk / 'platform-tools/adb', sdk / 'emulator/emulator']
+    sdk_files += [path for path in (sdk / 'licenses').glob('*') if path.is_file()]
+    result['android'] = file_digest(sdk_files)
+    for binary, variable, sibling in [('PYRY_BIN', 'PYRYCODE_SRC', 'pyrycode'), ('RELAY_BIN', 'PYRYCODE_RELAY_SRC', 'pyrycode-relay')]:
+        if os.environ.get(binary):
+            result[binary] = file_digest([Path(os.environ[binary])])
+        else:
+            source = Path(os.environ.get(variable, str(root.parent / sibling))).resolve()
+            result[variable] = {'tree': checkout_tree(source), 'go': go_inputs(source)}
+    for variable in ('FAKE_CLAUDE_BIN',):
+        if os.environ.get(variable):
+            result[variable] = file_digest([Path(os.environ[variable])])
+    go = shutil.which('go')
+    if go is None:
+        raise ValueError('Go toolchain is unavailable')
+    result['goExecutable'] = file_digest([Path(go)])
+    return result
+
+
+def main():
+    try:
+        root = Path(__file__).resolve().parents[1]
+        print(json.dumps(snapshot(root, Path.cwd()), sort_keys=True))
+    except (KeyError, OSError, ValueError, subprocess.SubprocessError):
+        print('Mobile external gate inputs are unavailable or changed locally; retained gate reuse disabled.', file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
