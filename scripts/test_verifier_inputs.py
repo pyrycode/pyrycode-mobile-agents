@@ -1,6 +1,7 @@
 """External helper and SDK changes invalidate retained Mobile gates."""
 import importlib.machinery
 import importlib.util
+import json
 from pathlib import Path
 import subprocess
 import tempfile
@@ -58,6 +59,34 @@ class VerifierInputsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(OSError):
                 inputs.file_digest([Path(directory) / 'missing'])
+
+    def requirements(self, body='## Live tests\nall', labels=(), base='base', prs=None):
+        with patch.object(inputs, 'run', side_effect=['feature/42', base]), \
+             patch.object(inputs.subprocess, 'check_output', side_effect=[json.dumps({'labels': [{'name': name} for name in labels]}).encode(),
+                 json.dumps([{'number': 43, 'body': body}] if prs is None else prs).encode()]) as command:
+            value = inputs.requirements_inputs(Path('/fixture'))
+            self.assertTrue(all(call.kwargs['timeout'] == 3 for call in command.call_args_list))
+            return value
+
+    def test_valid_body_label_or_merge_base_edits_invalidate_unchanged_source(self):
+        before = self.requirements()
+        self.assertEqual(before, self.requirements())
+        self.assertNotEqual(before, self.requirements(body='## Live tests\nde.pyryco.mobile.e2e.InteractiveStreamE2ETest#changedMethod'))
+        self.assertNotEqual(before, self.requirements(labels=['security-sensitive']))
+        self.assertNotEqual(before, self.requirements(base='new-base'))
+
+    def test_explicit_no_open_pr_is_distinct_from_an_unavailable_lookup(self):
+        self.assertEqual(self.requirements(prs=[]), self.requirements(prs=[]))
+        self.assertNotEqual(self.requirements(prs=[]), self.requirements())
+        with patch.object(inputs, 'run', side_effect=['feature/42', 'base']), \
+             patch.object(inputs.subprocess, 'check_output', side_effect=subprocess.TimeoutExpired('gh', 3)):
+            with self.assertRaises(subprocess.SubprocessError):
+                inputs.requirements_inputs(Path('/fixture'))
+        with patch.object(inputs, 'run', return_value='main'):
+            with self.assertRaises(ValueError):
+                inputs.requirements_inputs(Path('/fixture'))
+        with patch.object(inputs, 'snapshot', side_effect=subprocess.TimeoutExpired('gh', 3)):
+            self.assertEqual(1, inputs.main())
 
     def test_real_untracked_go_source_changes_external_checkout_inputs(self):
         with tempfile.TemporaryDirectory() as directory:

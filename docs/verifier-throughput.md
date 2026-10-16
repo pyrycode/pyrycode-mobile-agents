@@ -130,3 +130,74 @@ The launcher never stops unrelated Gradle daemons. The external-input snapshot
 includes this launcher, its selected Java executable/release, Gradle entry jar
 and instrumentation agent. Managed static/build, JVM, UI and scripted commands
 all use this launcher under the shared admission lock.
+
+## Current Mac device policy, 2026-10-17
+
+One fresh normal device run with UI_GATE_FULL=1 passed in 1719.22 seconds.
+The retained raw XML has 335 named cases: 334 passed, zero failed and one
+intentional RenameDialogCaptureTest screenshot skip. All 71 RecordedMobileSuiteTest
+methods executed and passed. Their recorded wire delays and native assertions
+consumed 1083.658 seconds. The other executed methods consumed 494.991 seconds.
+APK preparation took 87.264 seconds. The full gate's remaining time includes
+managed emulator setup, result collection and cleanup. This is one current run,
+not an average. The older 30-run Mac average predates these 71 recorded scenarios.
+
+The two impossible-match replay controls alone consumed 90.811 and 91.427 seconds.
+Their manual/live deadlines remain unchanged. Replay waits for every preceding
+recorded request and delivery, then gives the same impossible native matcher a
+one-second deadline. A deterministic unit test retains the captured 83417 ms
+client tail and proves that prior delivery is required without sleeping that tail.
+Fresh native word/tool replays passed with zero skips in 9.263 and 7.730 seconds,
+respectively. Compared with 182.238 seconds for those same two original cases,
+this removes 165.245 seconds from the measured case timeline. The entire focused
+run took 39.88 seconds including emulator setup, installation and a fault control.
+Changing one actual delivered assistant frame from ping to pong made the native
+impossible-word matcher fail with its exact unexpected-match error in 8.95 seconds.
+The check still observes the real rendered bubble. This is a measured case saving,
+not a second full-suite measurement. Other long-running and reconnect timings remain unchanged.
+
+The managed launcher also passed empty-project help probes on both actual Linux
+Mobile containers: HP 3.180 seconds and Fractal 4.873 seconds. Both used the existing
+JDK 21.0.12.1 and Gradle 9.4.1 installations, with no detached worker marker.
+Actual Mac conflicting JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS and _JAVA_OPTIONS heap
+controls also retained client execution. The snapshot includes active user Gradle
+properties and initialization scripts as well as selected Java/Gradle binaries.
+
+
+Final managed static checks, debug APK assembly and instrumentation compilation
+passed in 56.59 seconds. A focused 26-method JVM run passed in 58.44 seconds,
+including compilation of the changed replay barrier and concurrent main's recorded
+phone-identity tests. The exact two unusual JSON names passed fresh in 7.03 seconds
+with compilation warm. The earlier full fresh 5718-test proof took 417.91 seconds
+under contention; it predates the additional main/barrier test cases, which the
+focused run covers. Avoid treating the comparison between those differently
+loaded runs as a routine full-verifier saving.
+
+Actual native cancellation verified the final Gradle Java client and emulator
+shared the pinned Android owner's group. Both host and device holds remained
+locked while any group member was alive. All members exited before device release,
+then host release. Cancellation cleanup took 0.617 seconds with expected exit 130.
+
+The complete 21-scenario scripted gate executed 22 tests in 332.44 seconds:
+21 passed, one failed and none skipped. The read-confirmation method tracked by
+[#2198](https://github.com/pyrycode/pyrycode-mobile/issues/2198) retained its original
+90-second assertion. Its exact two-method scenario failed identically on candidate
+3303663af and unchanged current main ac4c43f77, with the durable-gap companion
+passing in each. Candidate named comparison took 137.46 seconds. Main took 227.67
+seconds including clean instrumentation compilation. Both used identical frozen
+daemon, relay and fake-Claude binaries, and byte-identical application APKs.
+The baseline used the same external reviewed gate and an untracked launcher
+compatibility bridge; its tracked application and test source stayed unchanged.
+Original red XML and logs remain retained. The existing operator hold was untouched.
+
+A successful selected spinner comparison executed exactly its original single
+method with zero failures or skips in 25.15 seconds. It did not run unrelated
+scenarios. These comparisons preserve original scenario composition, including
+mandatory companion methods.
+
+Strict retained-check provenance also binds the freshly read issue labels,
+current PR body and resolved merge base used by pre-verify. Each GitHub read has a
+three-second deadline, within the shared hook's 15-second limit. Missing ticket
+context, malformed/unavailable metadata or a failed lookup disables reuse. An
+explicit successful empty PR list remains distinguishable from a failed lookup.
+Only the digest is emitted. PR text and authentication values are never printed.

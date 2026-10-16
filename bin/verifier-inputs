@@ -66,8 +66,45 @@ def gradle_user_inputs(home):
     return file_digest(files)
 
 
+def requirements_inputs(product):
+    branch = run('git', 'branch', '--show-current', cwd=product)
+    match = re.fullmatch(r'feature/(\d+)', branch)
+    if match is None:
+        raise ValueError('pre-verify ticket context is unavailable')
+    ticket = int(match[1])
+    base = None
+    for reference in ('origin/main', 'main'):
+        try:
+            base = run('git', 'merge-base', 'HEAD', reference, cwd=product)
+            break
+        except subprocess.CalledProcessError:
+            continue
+    if not base:
+        raise ValueError('pre-verify merge base is unavailable')
+    # Use the same supported read-only endpoints as pre-verify. Each lookup is
+    # bounded so both fit inside the dispatcher's 15-second input-hook budget.
+    issue = json.loads(subprocess.check_output(
+        ['gh', 'issue', 'view', str(ticket), '--repo', 'pyrycode/pyrycode-mobile', '--json', 'labels'],
+        cwd=product, stderr=subprocess.PIPE, timeout=3))
+    prs = json.loads(subprocess.check_output(
+        ['gh', 'pr', 'list', '--repo', 'pyrycode/pyrycode-mobile', '--head', branch, '--state', 'open',
+         '--json', 'number,body', '--limit', '1'], cwd=product, stderr=subprocess.PIPE, timeout=3))
+    labels = issue.get('labels') if isinstance(issue, dict) else None
+    if not isinstance(labels, list) or any(not isinstance(label, dict) or not isinstance(label.get('name'), str) for label in labels):
+        raise ValueError('pre-verify labels are unavailable')
+    if not isinstance(prs, list) or len(prs) > 1:
+        raise ValueError('pre-verify pull request metadata is unavailable')
+    for pr in prs:
+        if not isinstance(pr, dict) or not isinstance(pr.get('number'), int) or 'body' not in pr or pr['body'] is not None and not isinstance(pr['body'], str):
+            raise ValueError('pre-verify pull request metadata is incomplete')
+    # An empty list is an explicit successful no-open-PR lookup, not a failure.
+    data = {'ticket': ticket, 'mergeBase': base, 'labels': sorted(label['name'] for label in labels), 'pullRequests': prs}
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
 def snapshot(root, product):
     result = {'agentsTree': checkout_tree(root), 'dispatcherTree': checkout_tree(root / 'dispatcher')}
+    result['preVerifyRequirements'] = requirements_inputs(product)
     result['python'] = file_digest([Path(sys.executable)])
     result['pythonVersion'] = sys.version
     managed = root / 'scripts/gradle-gate.py'
