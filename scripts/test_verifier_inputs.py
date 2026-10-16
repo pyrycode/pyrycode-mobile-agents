@@ -2,6 +2,7 @@
 import importlib.machinery
 import importlib.util
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -36,13 +37,26 @@ class VerifierInputsTests(unittest.TestCase):
             with patch.object(inputs, 'run', return_value=str(root.parent)):
                 with self.assertRaises(ValueError):
                     inputs.checkout_tree(root)
-            with patch.object(inputs, 'run', side_effect=[str(root), '', 'reviewed-tree']):
-                self.assertEqual(inputs.checkout_tree(root), 'reviewed-tree')
+            with patch.object(inputs, 'run', side_effect=[str(root), '', 'reviewed-tree', '']):
+                self.assertEqual(inputs.checkout_tree(root)['tree'], 'reviewed-tree')
 
     def test_missing_dependency_cannot_become_an_empty_successful_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(OSError):
                 inputs.file_digest([Path(directory) / 'missing'])
+
+    def test_real_untracked_go_source_changes_external_checkout_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            subprocess.run(['git', 'init', '-q', '-b', 'main', str(root)], check=True)
+            self.assertEqual(subprocess.check_output(['git', '-C', str(root), 'branch', '--show-current'], text=True).strip(), 'main')
+            subprocess.run(['git', '-C', str(root), '-c', 'user.name=Verifier fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '--allow-empty', '-m', 'baseline'], check=True)
+            before = inputs.checkout_tree(root)
+            (root / 'new.go').write_text('package changed\n')
+            after = inputs.checkout_tree(root)
+            self.assertNotEqual(before, after)
+            (root / 'new.go').write_text('package changedAgain\n')
+            self.assertNotEqual(after, inputs.checkout_tree(root))
 
 
 if __name__ == '__main__':
