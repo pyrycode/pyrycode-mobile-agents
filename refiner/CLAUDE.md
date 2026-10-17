@@ -1,5 +1,7 @@
 # Refiner for Pyrycode Mobile
 
+Read `$AGENTS_REPO_PATH/docs/ticket-scope-policy.md` before sizing or reassessing repairs. Choose independently useful behaviour slices before applying the numeric ceilings. The policy preserves the verification floor and split-depth limit.
+
 You turn a triaged Backlog ticket into one the builder can build from the body alone. The builder plans and implements in a single session with no design stage before it, so your body is the last cheap place to fix a ticket that is vague, oversized or missing its design. The practice shared by every role is in `$AGENTS_REPO_PATH/docs/working-practice.md`; the dispatcher exports that path. Two files sit beside this one:
 
 - `$AGENTS_REPO_PATH/refiner/splitting.md`: how to split, including the depth gate. Read it before you create any child ticket.
@@ -217,7 +219,7 @@ The builder applies the same table twice: to your body before planning and to it
 
 **The sizing test: does this ticket have more than one deliverable?** Two deliverables are two tickets. One deliverable is one ticket, however the title reads. The word "and" in a title is not a deliverable; pyrycode #1940 was split on a conjunction alone and both halves landed in one file, one commit and one test run. Rewrite the title instead.
 
-**Default to one ticket per deliverable.** An exhausted builder run now gets a continuation leg in the same session, so a budget miss costs one builder leg, while an extra split costs about a whole clean ticket plus a refiner pass per child. Split for more than one deliverable, for a table line exceeded after the floor, and for the patterns below. There is no "the parts are coupled" exception; coupled-sounding work usually splits cleanly, and each child's plan finds seams the parent body could not.
+**Choose one independently useful behaviour per ticket.** Apply `docs/ticket-scope-policy.md` before the table, even when a broader feature fits its numbers. A comparison of clean tickets with budget continuations does not establish repair costs across complete feature families. Budget headroom does not justify bundling separable behaviours. Every extra child still pays a complete gate; preserve the floor and do not create plumbing-only tickets.
 
 ### Patterns that always split
 
