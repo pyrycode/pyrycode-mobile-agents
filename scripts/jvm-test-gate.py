@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import sys
@@ -13,7 +14,9 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(os.environ.get('PYRY_MOBILE_REPO', Path(__file__).resolve().parents[2] / 'pyrycode-mobile')).resolve()
+check_selection = runpy.run_path(str(Path(__file__).with_name('test-selection.py')))['check_selection']
 NAME = re.compile(r'de\.pyryco\.mobile(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+#[A-Za-z_][A-Za-z0-9_]*')
+CLASS = re.compile(r'de\.pyryco\.mobile(?:\.[A-Za-z_$][A-Za-z0-9_$]*)+')
 
 
 def parse_tests(value):
@@ -91,8 +94,10 @@ def run(tests=None):
         if not executed:
             raise ValueError('no fresh executed JVM tests')
         for name in tests or []:
-            if name not in cases or cases[name].find('skipped') is not None:
-                raise ValueError('a selected JVM method did not execute')
+            selected = [case for identity, case in cases.items()
+                        if identity == name or ('#' not in name and identity.startswith(name + '#'))]
+            if not selected or not any(case.find('skipped') is None for case in selected):
+                raise ValueError('a selected JVM method or class did not execute')
         xml = ET.tostring(suites, encoding='unicode')
         (destination / 'dispatcher.xml').write_text(xml + '\n')
         metadata.update(executedInReport=len(executed), executedThisInvocation=0 if verified_cache else len(executed),
@@ -110,13 +115,18 @@ def run(tests=None):
 
 
 def main():
+    check_selection(ROOT, 'jvm', sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument('--tests', help='comma-separated exact package.Class#method selection')
     selection.add_argument('--tests-json', help='JSON array of exact Class#method names, including Kotlin names with spaces or commas')
+    selection.add_argument('--classes', help='one exact Mobile package.Class')
     args = parser.parse_args()
     try:
-        tests = parse_tests_json(args.tests_json) if args.tests_json is not None else parse_tests(args.tests) if args.tests is not None else None
+        if args.classes is not None and not CLASS.fullmatch(args.classes):
+            raise ValueError('--classes requires one exact Mobile package.Class')
+        tests = ([args.classes] if args.classes is not None else parse_tests_json(args.tests_json)
+                 if args.tests_json is not None else parse_tests(args.tests) if args.tests is not None else None)
     except ValueError as error:
         parser.error(str(error))
     return run(tests)
