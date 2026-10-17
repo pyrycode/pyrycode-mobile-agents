@@ -604,6 +604,22 @@ def build_apks(env, mode):
     return run_device_command(command, cwd=ROOT, env=env, stdout=sys.stderr, stderr=sys.stderr).returncode
 
 
+def managed_ui_environment(env, run_dir, device):
+    """Keep admission at the original home while Gradle uses a qualified OS image."""
+    if sys.platform != 'linux' or device != 'pixel2Api33Atd' or not env.get('ANDROID_HOME'):
+        return env
+    if not (Path(env['ANDROID_HOME']) / 'emulator/emulator').is_file():
+        return env  # The preceding APK build reports an incomplete SDK.
+    report = run_dir / 'managed-image.json'
+    result = run_device_command([sys.executable, str(Path(__file__).with_name('android-managed-image.py')),
+                                 '--report', str(report)], cwd=ROOT, env=env,
+                                stdout=sys.stderr, stderr=sys.stderr)
+    if result.returncode:
+        raise ValueError('managed OS image preparation failed; no device tests started')
+    prepared = json.loads(report.read_text())
+    return {**env, 'ANDROID_USER_HOME': prepared['androidUserHome'], 'ANDROID_AVD_HOME': prepared['avdHome']}
+
+
 def raise_interrupt(*_):
     raise KeyboardInterrupt
 
@@ -842,11 +858,17 @@ def main():
                         return 1
                     env[variable] = str(destination)
             built = build_apks(env, args.mode)
-            phase('preparation-finished')
             if built != 0:
                 print(f"Android gate failed: the app and test APK build exited {built}; no device test was started",
                       file=sys.stderr)
                 return 1
+            if args.mode == 'ui':
+                try:
+                    env = managed_ui_environment(env, run_dir, device)
+                except (OSError, ValueError) as error:
+                    print(f'Android gate failed: {error}', file=sys.stderr)
+                    return 1
+            phase('preparation-finished')
             env["E2E_APKS_BUILT"] = "1"
             print(f"Android gate: {args.mode} {args.scenario or ''}; artifacts: {run_dir}", file=sys.stderr)
             phase('device-command-started')

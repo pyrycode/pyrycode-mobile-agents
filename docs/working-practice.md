@@ -134,6 +134,14 @@ When a role runs device or scripted tests on this host:
 
 ## Runner contract
 
+### Linux managed image preparation
+
+The Linux UI gate prepares its configured Android 13 Google ATD operating system before installing Mobile. Gradle first creates the device through its normal Setup task. The gate then restores it with the recorded renderer and hardware flags, waits for ten continuous seconds with at least 80 percent guest CPU idle, and saves the operating system. Mobile and its test package must be absent. A second read-only restore must also settle before the generation is published for tests. Each preparation boot has a three-minute deadline. Failure starts no device tests.
+
+Prepared generations live beneath the original Android home in `pyrycode-managed-images`. Their identity includes the preparation policy, device declaration, emulator and image versions, launcher, and relevant Gradle and renderer settings. A validated generation is reused across product worktrees. Saved memory, named disk checkpoints and required snapshot metadata establish reuse. Mutable emulator load counters do not invalidate it. An invalid generation starts one fresh preparation attempt. Failed attempts retain their evidence.
+
+The original host and device locks cover preparation and the test run. The original debug signer is shared by path. Gradle Setup remains enabled during the actual test invocation. Google Play Services remains enabled. App work, CPU readiness assertions, draw limits and report counting remain unchanged. Preparation logs, guest CPU samples and restore evidence stay with the generation. The gate's run folder records the selected generation and whether it was reused.
+
 ### Android cleanup custody
 
 Focused non-live device checks use `python3 scripts/android-test-gate.py ui --tests package.Class#method`. They use the same admission and report checks as complete gates. The device hold now covers compilation too. Kotlin runs in the owned Gradle process. APK and test commands both use the existing cleanup owner. A failed build starts no device tests and releases the hold only after cleanup is confirmed. No timing thresholds or acceptance retries change.
