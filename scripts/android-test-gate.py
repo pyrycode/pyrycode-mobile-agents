@@ -11,6 +11,7 @@ import json
 import math
 import os
 import re
+import runpy
 import select
 from pathlib import Path
 import shutil
@@ -24,6 +25,7 @@ import uuid
 import xml.etree.ElementTree as ET
 
 ROOT = Path(os.environ.get("PYRY_MOBILE_REPO", Path(__file__).resolve().parents[2] / "pyrycode-mobile")).resolve()
+check_selection = runpy.run_path(str(Path(__file__).with_name('test-selection.py')))['check_selection']
 E2E_PACKAGE = "de.pyryco.mobile.e2e"
 SCENARIOS = ("session-error", "reply-suggestion", "stop-background-task", "selection-copy", "background-agent", "send-now", "direct-share", "ping", "stream", "reopen-stream", "spinner", "tool", "tool-failed", "tool-progress", "reconnect", "offline-retry", "replay-order", "tool-then-text", "refusal", "mcp-failed", "context-overflow")
 
@@ -698,6 +700,7 @@ def run_scripted_all(env, run_dir, device, selection=None):
 
 
 def main():
+    check_selection(ROOT, 'android', sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("ui", "scripted", "scripted-all", "live"))
     parser.add_argument("scenario", nargs="?", choices=SCENARIOS)

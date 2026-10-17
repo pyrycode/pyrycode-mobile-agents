@@ -3,10 +3,12 @@
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import sys
 
 ROOT = Path(os.environ.get('PYRY_MOBILE_REPO', Path(__file__).resolve().parents[2] / 'pyrycode-mobile')).resolve()
+check_selection = runpy.run_path(str(Path(__file__).with_name('test-selection.py')))['check_selection']
 VERSION = '9.4.1'
 JAVA = '21'
 MODULE_OPTIONS = [
@@ -90,6 +92,7 @@ def launch(root, args, env):
 
 
 def main():
+    check_selection(ROOT, 'gradle', sys.argv[1:])
     try:
         command, env = launch(ROOT, sys.argv[1:], os.environ)
     except (KeyError, OSError, ValueError) as error:

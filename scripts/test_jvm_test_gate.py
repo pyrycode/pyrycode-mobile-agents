@@ -49,6 +49,17 @@ class JvmGateTests(unittest.TestCase):
         self.assertEqual(self.command[-1], 'de.pyryco.mobile.ExampleTest.works')
         self.assertIn('name="works"', output)
 
+    def test_exact_class_selection_requires_executed_members_of_that_class(self):
+        xml = '<testsuite tests="2"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/><testcase classname="de.pyryco.mobile.ExampleTest" name="other"><skipped/></testcase></testsuite>'
+        status, _ = self.run_gate(xml, tests=['de.pyryco.mobile.ExampleTest'])
+        self.assertEqual(status, 0)
+        self.assertEqual(self.command[-1], 'de.pyryco.mobile.ExampleTest')
+        self.assertEqual(self.metadata['executedThisInvocation'], 1)
+        self.assertEqual(self.metadata['skipped'], 1)
+        self.assertNotEqual(self.run_gate(xml, tests=['de.pyryco.mobile.OtherTest'])[0], 0)
+        self.assertNotEqual(self.run_gate(xml.replace('name="works"/>', 'name="works"><skipped/></testcase>'),
+                                         tests=['de.pyryco.mobile.ExampleTest'])[0], 0)
+
     def test_stale_empty_missing_and_truncated_reports_cannot_pass(self):
         valid = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
         for xml, stale in [(None, False), ('<testsuite tests="0"/>', False), ('<testsuite>', False), (valid, True),
