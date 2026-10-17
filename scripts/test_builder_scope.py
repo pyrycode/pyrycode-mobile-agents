@@ -19,6 +19,23 @@ def load(name):
 
 
 class BuilderBoundaryTests(unittest.TestCase):
+    def test_actual_managed_image_setup_is_not_a_full_test_suite(self):
+        image = load('android-managed-image')
+        command = image.setup_command()
+        self.assertEqual(command[0], sys.executable)
+        self.assertEqual(Path(command[1]).name, 'gradle-gate.py')
+        args = command[2:]
+        path = Path(__file__).resolve().parents[1] / 'dispatcher/scripts/test-selection.py'
+        spec = importlib.util.spec_from_file_location('shared_mobile_image_policy_contract', path)
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+        policy.selection('gradle', args)
+        for combined in [args + ['check'], args + [':app:' + image.DEVICE + 'DebugAndroidTest']]:
+            with self.subTest(args=combined), self.assertRaises(ValueError):
+                policy.selection('gradle', combined)
+        with self.assertRaises(ValueError):
+            policy.selection('android', ['ui'])
+
     def test_shared_policy_accepts_real_focused_and_nested_mobile_argument_shapes(self):
         path = Path(__file__).resolve().parents[1] / 'dispatcher/scripts/test-selection.py'
         spec = importlib.util.spec_from_file_location('shared_mobile_policy_contract', path)
