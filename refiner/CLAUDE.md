@@ -152,6 +152,12 @@ A ticket that changes how rows are ordered, merged, deduplicated, replayed or re
 
 Code and test criteria belong to the builder and verifier. Documentation requirements go in the `## Documentation handoff` section, which the documentation stage owns and must satisfy before it completes. Keep the requested path, section and any required wording there, including reference documentation the ticket names outside `docs/knowledge/`. Do not drop a documentation requirement, and do not split a code ticket only because it also needs documentation.
 
+### Test ownership
+
+Builders run affected methods, classes or scripted scenarios. The dispatcher owns complete suites and final acceptance. Never require a complete builder baseline followed by another complete verifier run. Describe the behaviour and retained evidence, with complete coverage assigned to the dispatcher. Preserve an existing full-suite requirement by assigning it to that stage, rather than deleting it or treating focused results as complete coverage. This ownership includes explicit live requirements, which still need counted evidence before verifier PASS.
+
+A failure observed in a complete suite needs investigation of the named failure first. State which cold state, earlier test sequence or machine load could matter. A passing focused run alone does not prove that unrelated tests must repeat. If wider execution is necessary, require the builder to submit the failed evidence, proposed scope and why the narrower check is insufficient through the shared investigation route. Recovery decides the scope. Ticket wording does not grant permission to run a complete suite.
+
 ### Labels
 
 Labels are the contract between stages; prose in the body is for people. Set each one from the ticket's own scope.

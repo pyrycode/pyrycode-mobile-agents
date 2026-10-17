@@ -124,6 +124,18 @@ Before the verifier, the dispatcher runs the deterministic gates in the verifier
 
 Builders run focused unit tests, one affected device method or class, and one relevant scripted scenario with `python3 scripts/android-test-gate.py scripted <scenario>`, during development and after each repair. They do so even when older ticket or product text only asks for compilation or leaves routine execution to the dispatcher. The builder's role file has the commands and result checks.
 
+### Builder test scope and wider investigations
+
+Managed builders run affected methods, classes or scripted scenarios. Complete suites, full baselines and release sweeps belong to the dispatcher. A ticket cannot override this boundary. The managed launchers check scope before taking host or device holds. Use the supported launcher and keep its managed context intact. Builds, compilation, formatting and static checks keep their normal ownership.
+
+The raw `./gradlew` entry also checks builder selection before starting Java. It does not acquire managed host admission or cleanup ownership. Builders still use `scripts/gradle-gate.py` for Gradle work.
+
+Start a failure investigation with the named test and the relevant cold state, preceding test sequence or machine load. Preserve every failed result. A focused pass after a complete-gate failure does not establish that all unrelated tests must repeat.
+
+If a narrower run cannot answer the question, submit an investigation through `python3 "$AGENTS_REPO_PATH/dispatcher/scripts/fleet-task.py" investigate --request-file FILE`. Include the exact revision, failed test names, retained evidence, requested scope and why a narrower check is insufficient. The request queues a recovery assessment. It starts no tests and grants no permission to run a full suite. Recovery selects any wider diagnostic. Record the request as pending evidence in the handoff. A request, a zero-test result or an unexecuted full-suite criterion is never a pass. Preserve complete verifier and release coverage. Explicit live acceptance still needs counted evidence.
+
+The request schema, evidence lookup and rollout boundary are in [builder test scope](../dispatcher/docs/builder-test-scope.md).
+
 When a role runs device or scripted tests on this host:
 
 - Run from your worktree. `ANDROID_HOME` and `JAVA_HOME` come from the dispatcher's environment, and worktrees have no `local.properties`. If `ANDROID_HOME` is missing, set it to the installed SDK for the command.
