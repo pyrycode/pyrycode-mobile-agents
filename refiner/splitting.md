@@ -8,6 +8,8 @@ Every GitHub write here goes through the pipeline helper and the body-file folde
 
 ## Split depth: stop at two
 
+Before creating children, read `$AGENTS_REPO_PATH/docs/ticket-scope-policy.md` for the feature-root and policy markers. Preserve the original feature root on the parent and every child. Closing this parent replaces it with children; it does not complete the feature.
+
 Before you split, read the ticket's parent chain:
 
 ```bash
