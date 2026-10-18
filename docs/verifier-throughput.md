@@ -4,6 +4,65 @@ The verifier runs static checks, all JVM tests, application assembly and test
 compilation, the full device selection and every scripted scenario. Source review
 already overlaps these gates. One verifier owns the managed device at a time.
 
+## Coordinated build candidate
+
+`python3 scripts/jvm-test-gate.py --with-build-checks` runs the same complete
+`check`, debug APK assembly and instrumented Kotlin compilation in one Gradle
+invocation. It uses the configuration cache so independent tasks within the
+single application module can overlap. Gradle's `--parallel` flag alone only
+overlaps different projects. Two Gradle workers bound the extra concurrency.
+Shared compilation and declared task dependencies remain owned by Gradle.
+
+The existing shared host hold covers the whole invocation. No second build
+process is started. Gradle continues independent tasks after a test failure so
+that a JVM failure cannot silently skip unrelated static or build checks.
+The combined mode emits named comparison evidence only when the build succeeds
+or its single reported failure is the JVM test task. A lint, compilation,
+configuration-cache or multiple-failure result exposes no named XML for baseline
+acceptance. Raw Gradle output and command metadata remain in the evidence folder.
+Missing, stale, truncated and zero-execution test reports retain their current
+checks. Focused comparisons still use the unchanged `--tests-json` command.
+The combined mode refuses focused selections.
+
+This is an opt-in candidate. To evaluate it, replace the three static, JVM and
+assembly gate commands with the one combined command. Update only the JVM
+format key to the combined command and keep its existing focused baseline.
+On a host using the global build-slot initialization hook, first install the
+reviewed `gradle/pyry-build-slots.gradle` through the normal controlled rollout.
+The earlier hook stores a Java file lock in system properties. A real probe
+discarded the configuration cache even though Gradle returned success. The
+combined wrapper now rejects that observed discard. The revised hook keeps
+serializable parameters and reacquires its two-place hold during task execution.
+It still acquires before configuration on a cache miss. Waiting, device exclusions
+and the existing twenty-minute fail-open policy remain unchanged. Task consumers
+share the hold without limiting their internal parallelism. No installed hook is
+changed merely by checking out this candidate.
+One root acquisition task runs before normal tasks. Those tasks declare their
+service use and depend on that task. Their existing actions remain unchanged,
+avoiding cache misses caused solely by an admission action on every task.
+`gradle/verifier-coordinated.env` contains the complete proposed gate and format
+settings for an operator-controlled trial. Read it before sourcing it into an
+isolated dispatcher environment. It does not change any running dispatcher.
+Retain the initial fast checks, device gate, every scripted scenario, timeout
+and external-input snapshot. A changed ordered command list invalidates older
+retained gate passes. Do not add configuration caching to the general launcher
+or product settings as part of this trial.
+
+Compare identical source and required tasks on the same host. Distinguish fresh
+execution from cached results. Verify actual task overlap, complete result counts
+and both non-test and named-test failure controls before activation. A successful
+dry run only establishes graph configuration, not a timing improvement.
+
+The explicit integration probe is `scripts/gradle-build-slots-integration.py`.
+Run it through the product's normal `scripts/test-admission.py` launcher.
+Pass `--product-root`, an isolated `--gradle-user-home`, and the existing
+machine `--slot-directory`. The isolated home must share that exact slot
+directory and should link the existing caches and pinned Gradle distribution.
+It leaves the installed init scripts untouched. The probe takes both machine
+record locks, verifies that Gradle waits, releases one, checks the running task
+still holds it, then checks both locks are free after completion. It repeats
+with a real configuration-cache hit. It retains both raw logs and a JSON result.
+
 ## Measured baseline
 
 The latest 30 completed Mac verifier logs retained locally end on 2026-10-14.

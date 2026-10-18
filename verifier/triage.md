@@ -20,6 +20,8 @@ The injected failure context names the failing gate and carries its output tail.
 
 The gates run in order and stop at the first red. A pre-verify failure means nothing else ran, so the build status is unknown; review the rest of the diff from source and name the gates that did not run. A docs failure means only pre-verify ran before it. A `check` failure means the docs guard and script tests passed and the build never ran. A build failure means the unit suite, lint and Spotless already passed. A device or scripted failure means every compile gate passed. Say which gates ran in the verdict. `./gradlew assembleDebug` is also part of the builder's own gate, so a red there is a builder that skipped its verification step. `SDK location not found` is the dispatch environment missing `ANDROID_HOME`, not the PR; classify it as infra and name the variable.
 
+When the command includes `--with-build-checks`, the static, JVM and assembly tasks share one Gradle graph. Independent tasks continue after a failure. The serial-order implications above do not apply within that combined gate. Read the actual task results in retained `gradle.log` and `invocation.json`. Named XML is exposed only for a sole JVM-task failure. Mixed or non-test failures keep raw XML as diagnostic evidence but cannot be excused through a named-test baseline. Apply the existing lint, build and infrastructure routes to every reported failure.
+
 **Getting the PR-side evidence.** Read the retained original XML and invocation
 metadata named by the dispatcher. The JVM wrapper emits joined JUnit XML and
 retains build logs separately. A successful Gradle cache hit is labelled reused,
