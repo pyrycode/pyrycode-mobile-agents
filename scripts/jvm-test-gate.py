@@ -39,11 +39,16 @@ def parse_tests_json(value):
     return list(dict.fromkeys(names))
 
 
-def run(tests=None):
+def run(tests=None, *, with_build_checks=False):
+    if with_build_checks and tests is not None:
+        raise ValueError('--with-build-checks cannot be combined with a focused comparison')
     artifacts = Path(os.environ.get('PYRY_GATE_EVIDENCE_DIR') or ROOT / 'build/dispatcher-tests')
     artifacts.mkdir(parents=True, exist_ok=True, mode=0o700)
     destination = Path(tempfile.mkdtemp(prefix='jvm-', dir=artifacts))
-    command = [str(ROOT / 'scripts/gradle-gate.py'), ':app:testDebugUnitTest']
+    tasks = (['check', ':app:assembleDebug', ':app:compileDebugAndroidTestKotlin',
+              '--configuration-cache', '--max-workers=2', '--continue']
+             if with_build_checks else [':app:testDebugUnitTest'])
+    command = [str(ROOT / 'scripts/gradle-gate.py'), *tasks]
     if tests is not None:
         command.append('--rerun')
     command += ['--console=plain', '--no-daemon', '-Pkotlin.compiler.execution.strategy=in-process']
@@ -60,12 +65,31 @@ def run(tests=None):
                       re.search(r'^> Task :app:testDebugUnitTest (?:FROM-CACHE|UP-TO-DATE)$', result.stdout, re.MULTILINE))
     outcome = re.search(r'^> Task :app:testDebugUnitTest(?: (FROM-CACHE|UP-TO-DATE|FAILED))?$', result.stdout, re.MULTILINE)
     metadata = {'command': command, 'exitCode': result.returncode,
+                'withBuildChecks': with_build_checks,
                 'gradleTaskOutcome': (outcome.group(1) or 'EXECUTED') if outcome else 'UNKNOWN',
                 'reusedGradleResult': bool(verified_cache)}
+    (destination / 'gradle.log').write_text(result.stdout)
     suites = ET.Element('testsuites')
     cases = {}
     try:
         reports = sorted((ROOT / 'app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'))
+        # Keep raw reports even when a simultaneous build failure forbids exposing
+        # their names for automatic retry or baseline acceptance.
+        for path in reports:
+            shutil.copy2(path, destination / path.name)
+        if with_build_checks and 'Configuration cache entry discarded' in result.stdout:
+            raise ValueError('coordinated build discarded its configuration cache; inspect the Gradle initialization hooks')
+        # --continue finishes independent checks after a JVM failure. Only Gradle's
+        # single-exception footer naming that task permits a named comparison.
+        # A lint/build/configuration-cache failure must never become acceptable
+        # merely because the test failures recur on main.
+        if with_build_checks and result.returncode != 0:
+            footer = result.stdout[result.stdout.rfind('FAILURE:'):]
+            if (result.stdout.count('FAILURE:') != 1 or
+                    'FAILURE: Build failed with an exception.' not in footer or
+                    footer.count('* What went wrong:') != 1 or
+                    not re.search(r"\* What went wrong:\s*Execution failed for task ':app:testDebugUnitTest'\.", footer)):
+                raise ValueError('coordinated build failed outside the JVM test task; no named comparison evidence')
         for path in reports:
             if path.stat().st_mtime_ns < started and not verified_cache:
                 continue
@@ -88,7 +112,6 @@ def run(tests=None):
                 if name in cases:
                     raise ValueError('duplicate JVM test')
                 cases[name] = case
-            shutil.copy2(path, destination / path.name)
             suites.append(suite)
         executed = [case for case in cases.values() if case.find('skipped') is None]
         if not executed:
@@ -110,6 +133,8 @@ def run(tests=None):
         print(f'JVM gate: {len(executed)} executed in report; {reuse}; artifacts: {destination}', file=sys.stderr)
         return result.returncode or int(failed)
     except (OSError, ValueError, ET.ParseError) as error:
+        metadata['evidenceError'] = str(error)
+        (destination / 'invocation.json').write_text(json.dumps(metadata, indent=2) + '\n')
         print(f'JVM gate: {error}; artifacts: {destination}', file=sys.stderr)
         return result.returncode or 1
 
@@ -117,6 +142,8 @@ def run(tests=None):
 def main():
     check_selection(ROOT, 'jvm', sys.argv[1:])
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--with-build-checks', action='store_true',
+                        help='run full check, APK assembly and Android test compilation in one bounded concurrent Gradle graph')
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument('--tests', help='comma-separated exact package.Class#method selection')
     selection.add_argument('--tests-json', help='JSON array of exact Class#method names, including Kotlin names with spaces or commas')
@@ -127,9 +154,11 @@ def main():
             raise ValueError('--classes requires one exact Mobile package.Class')
         tests = ([args.classes] if args.classes is not None else parse_tests_json(args.tests_json)
                  if args.tests_json is not None else parse_tests(args.tests) if args.tests is not None else None)
+        if args.with_build_checks and tests is not None:
+            raise ValueError('--with-build-checks cannot be combined with a focused comparison')
     except ValueError as error:
         parser.error(str(error))
-    return run(tests)
+    return run(tests, with_build_checks=args.with_build_checks)
 
 
 if __name__ == '__main__':

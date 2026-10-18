@@ -17,7 +17,7 @@ CASE = 'de.pyryco.mobile.ExampleTest#works'
 
 
 class JvmGateTests(unittest.TestCase):
-    def run_gate(self, xml=None, code=0, tests=None, stale=False, log=''):
+    def run_gate(self, xml=None, code=0, tests=None, stale=False, log='', with_build_checks=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             reports = root / 'app/build/test-results/testDebugUnitTest'
@@ -34,9 +34,10 @@ class JvmGateTests(unittest.TestCase):
             output = io.StringIO()
             with patch.object(gate, 'ROOT', root), patch.object(gate.subprocess, 'run', side_effect=execute), \
                  patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
-                status = gate.run(tests)
+                status = gate.run(tests, with_build_checks=with_build_checks)
                 metadata = list((root / 'build/dispatcher-tests').glob('jvm-*/invocation.json'))
                 self.metadata = json.loads(metadata[0].read_text()) if metadata else None
+                self.retained_xml = [path.read_text() for path in (root / 'build/dispatcher-tests').glob('jvm-*/TEST-*.xml')]
             return status, output.getvalue()
 
     def test_only_named_methods_are_rerun_and_reported(self):
@@ -75,6 +76,56 @@ class JvmGateTests(unittest.TestCase):
     def test_nonzero_build_is_preserved_even_with_passing_xml(self):
         xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
         self.assertEqual(self.run_gate(xml, code=17)[0], 17)
+
+    def test_coordinated_build_uses_one_bounded_gradle_graph_and_retains_named_results(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        self.assertEqual(self.run_gate(xml, with_build_checks=True)[0], 0)
+        for task in ['check', ':app:assembleDebug', ':app:compileDebugAndroidTestKotlin']:
+            self.assertIn(task, self.command)
+        for option in ['--continue', '--configuration-cache', '--max-workers=2']:
+            self.assertIn(option, self.command)
+        self.assertNotIn('-x', self.command)
+        self.assertTrue(self.metadata['withBuildChecks'])
+
+    def test_coordinated_non_test_red_cannot_expose_named_failures_for_baseline_acceptance(self):
+        xml = '<testsuite tests="1" failures="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"><failure/></testcase></testsuite>'
+        jvm = "Execution failed for task ':app:testDebugUnitTest'."
+        for log in ['', 'FAILURE: Build completed with 2 failures.\n' + jvm,
+                    "FAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':app:lintDebug'.",
+                    'FAILURE: Build failed with an exception.\n\n* What went wrong:\n' + jvm + '\n\n* What went wrong:\nOther failure']:
+            with self.subTest(log=log):
+                status, output = self.run_gate(xml, code=1, log=log, with_build_checks=True)
+                self.assertNotEqual(status, 0)
+                self.assertEqual(output, '')
+                self.assertIn('outside the JVM test task', self.metadata['evidenceError'])
+                self.assertTrue(self.metadata['withBuildChecks'])
+                self.assertEqual(self.retained_xml, [xml])
+
+    def test_coordinated_only_jvm_failure_keeps_exact_named_comparison_evidence(self):
+        xml = '<testsuite tests="1" failures="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"><failure/></testcase></testsuite>'
+        log = "FAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':app:testDebugUnitTest'.\n"
+        status, output = self.run_gate(xml, code=1, log=log, with_build_checks=True)
+        self.assertNotEqual(status, 0)
+        self.assertIn('<failure', output)
+
+    def test_coordinated_build_rejects_narrow_selection_before_launch(self):
+        with patch.object(gate.subprocess, 'run') as execute, self.assertRaises(ValueError):
+            gate.run([CASE], with_build_checks=True)
+        execute.assert_not_called()
+
+    def test_coordinated_cached_jvm_report_requires_success_of_the_entire_build(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        log = '> Task :app:testDebugUnitTest FROM-CACHE\n'
+        self.assertEqual(self.run_gate(xml, stale=True, log=log, with_build_checks=True)[0], 0)
+        self.assertEqual(self.metadata['executedThisInvocation'], 0)
+        self.assertNotEqual(self.run_gate(xml, stale=True, log=log, code=1, with_build_checks=True)[0], 0)
+
+    def test_coordinated_discarded_configuration_cache_is_not_a_successful_trial(self):
+        xml = '<testsuite tests="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
+        status, output = self.run_gate(xml, log='Configuration cache entry discarded with 1 problem.\n', with_build_checks=True)
+        self.assertNotEqual(status, 0)
+        self.assertEqual(output, '')
+        self.assertEqual(self.retained_xml, [xml])
 
     def test_suite_error_without_named_failure_stays_red(self):
         xml = '<testsuite tests="1" errors="1"><testcase classname="de.pyryco.mobile.ExampleTest" name="works"/></testsuite>'
