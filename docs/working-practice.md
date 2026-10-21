@@ -112,6 +112,8 @@ A rejected action may be retried only after Juhana explicitly approves retrying 
 
 Recorded approvals:
 
+- **#2338, approved by Juhana on 2026-10-21.** Juhana answered "Approve scoped continuation" for the Mobile builder to resume its preserved diagnostic work and exact Linux phone test against the merged Core 3711 repair. The preserved branch head is `ff0601fdeab9fc1e0739044f646af6bf487e44a6`. This continuation excludes the earlier refused Core priority edit, which the owning protected operator already resolved. Do not retry that foreign workflow edit. Complete the existing diagnostic, privacy and native acceptance requirements against the merged repair, with the original 20 second timeout, both test arms, counted results, actual source and binary revisions, phone phase evidence and cleanup. Keep historical failures. Ordinary approval checks remain active. A fresh rejection stops the run. Remove this entry once #2338 merges.
+
 - **#2149, approved by Juhana on 2026-10-14.** Codex approval review rejected the builder's test-edit and validation command at 08:52:40 EEST, reading an insert script as discarding tests. The builder may redo those two test additions and the rest of that command's edits as an additive patch that keeps all 13 existing test methods in `AuthoritativeThreadCacheTest.kt` and the saved implementation (local WIP commit `1090e5fe2d`). Make the edits with `apply_patch`, then run Gradle as a separate command. The approval covers only this ticket, and a new rejection still stops the run. Remove this entry once #2149 merges.
 
 ### Recorded approval outcomes
