@@ -189,3 +189,7 @@ cancelled; it is not kept as an idle worker between gates.
 The live test class is also used by a device-only onboarding test. Changes to that
 class or its shared helpers therefore require the UI gate. They no longer qualify
 for the earlier live-only source exemption.
+
+## Builder scope discovery, 2026-10-23
+
+Builders reassess during implementation and repair. Unexpected oversized work uses the shared dispatcher scope handoff. The orchestrator can apply an evidence-backed recovery split before verifier failures, including beyond ordinary refiner depth. The builder preserves partial work. Install the matching dispatcher revision before activating these prompts.

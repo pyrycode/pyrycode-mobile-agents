@@ -4,39 +4,9 @@ Read this when a run has to route the ticket somewhere other than an ordinary PR
 
 Write every issue or comment body to a file outside the worktree first. The dispatcher commits anything left dirty in the worktree and pushes it to the feature branch.
 
-## Splitting an oversized ticket
+## Oversized or newly expanded scope
 
-### Check the depth first
-
-Before proposing a split, walk the parent chain:
-
-```bash
-gh api graphql -f query='query($owner:String!,$repo:String!,$num:Int!){repository(owner:$owner,name:$repo){issue(number:$num){number parent{number parent{number}}}}}' \
-  -f owner=pyrycode -f repo=pyrycode-mobile -F num=<TICKET> \
-  --jq '.data.repository.issue | "parent \(.parent.number // "none") grandparent \(.parent.parent.number // "none")"'
-```
-
-If `grandparent` is anything other than `none`, do not split and do not stop. Add `needs-human:sizing`, comment with the split you would have made and the measurement behind it, then build the ticket as it stands, through plan, implementation and PR. Recursive splitting is a measured failure: pyrycode #1925 became #1937, then #1940, then #1943 and #1944 in about seventy minutes with no code written. Once splitting is off the table there is no outcome where the ticket is not built, so the label marks the judgement for later review rather than asking a question that must be answered first. On pyrycode #1938, the first ticket to reach this gate, stopping added nothing and cost a full extra run. State the measurement and your reading of it; do not use the label to avoid the call. Never ask the operator to add a `wip:` label to restart you: that label means an agent is running now, and it blocks dispatch.
-
-Parentage and dependency links are different things. Several blockers do not make a ticket a grandchild; the shared practice covers repairing a lineage that looks wrong.
-
-### Check the floor
-
-A slice whose only deliverable is consumed by exactly one sibling in the same family is part of that sibling, not a ticket. If your proposed split produces a child that nothing outside the family uses, merge it back. When the floor and the ceiling disagree, the floor wins: merge the one-consumer slice back even if the merged ticket exceeds a line of the table, state the overage in your plan, and build. The ceiling guards against a budget miss, which costs one continuation leg on Claude. The floor guards against a ticket that cannot be verified on its own, which no resume fixes. On the pyrycode #1720 split of 2026-09-02, four one-consumer pairs were cut apart to stay under the old ceiling, and ten tickets carried what five would have.
-
-### Propose the split
-
-Write the proposal and route the ticket back. On Claude, post it as a comment and add `needs-rework:refiner`; on Codex, return `needs_refinement` with the same text as the summary.
-
-> **Oversized: split as follows.**
-> - **A:** the first slice, what behaviour it adds and what interfaces it introduces.
-> - **B:** the second slice, what it consumes from A and what it adds; and so on.
->
-> Each child stands alone. The refiner writes a self-contained body for each, and each child's builder run plans from its own body.
-
-When the split comes from the plan re-count before commit, point each slice at seams in your Design section.
-
-Do not write a plan for the parent; it would be thrown away. Leave the worktree untouched in a split run, including scratch files, because the dispatcher's safety-net commit would push them to `feature/<ticket>`.
+Follow [builder scope reassessment](../docs/builder-scope-handoff.md) before planning, during implementation and on repair. The builder proposes smaller useful results and stops further expansion. The orchestrator assesses the evidence and applies any split. Preserve existing work at every depth. Use `needs_scope_review` on Codex or `error:builder:scope` through the managed workflow bridge on Claude.
 
 ## Waiting on an in-flight ticket
 
