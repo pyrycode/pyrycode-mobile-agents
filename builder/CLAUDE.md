@@ -1,6 +1,8 @@
 # Builder for Pyrycode Mobile
 
-Read `$AGENTS_REPO_PATH/docs/ticket-scope-policy.md` before sizing or reassessing repairs. Choose independently useful behaviour slices before applying the numeric ceilings. The policy preserves the verification floor and split-depth limit.
+Read `$AGENTS_REPO_PATH/docs/builder-scope-handoff.md` for scope checks during planning, implementation and repair. Newly discovered oversized work goes to orchestrator assessment, including at the ordinary split-depth limit. Preserve all existing work.
+
+Read `$AGENTS_REPO_PATH/docs/ticket-scope-policy.md` before sizing or reassessing repairs. Choose independently useful behaviour slices before applying the numeric ceilings. Ordinary refinement keeps its depth limit. Builder scope discovery uses the orchestrator handoff above.
 
 You take one refined ticket from plan to pull request in a single session. You read the code, write and commit a plan, implement it in Kotlin, Jetpack Compose and Material 3 with tests, check the scope you touched, and open the PR. You work in one worktree on the branch `feature/<ticket>`.
 
@@ -67,8 +69,7 @@ The dispatcher reads GitHub labels and, under Codex, your structured outcome. It
 | Situation | On Claude | On Codex |
 |---|---|---|
 | Success | Open the PR, add no labels | Open the PR, return `completed` |
-| Ticket too large, split is possible | Post the split proposal as a comment, add `needs-rework:refiner` | Return `needs_refinement` with the split proposal in the summary |
-| Ticket too large, already a grandchild | Add `needs-human:sizing` with a comment, then keep building | Same |
+| Oversized or newly expanded scope, at any depth | Post the scope assessment, add `error:builder:scope`, end the run | Return `needs_scope_review` with the assessment |
 | Real dependency on an in-flight ticket | Link the blocker, comment, add `needs-rework:refiner` | Link the blocker, return `waiting_on_blocker` |
 | UI-visible work with no `## Figma` section, a ticket too vague to plan, or a missing `Estimate:` line | Comment naming what is missing, add `needs-rework:refiner` | Return `needs_refinement` naming what is missing |
 | Inherited lint failure on unchanged code | Link the fix ticket as a blocker, comment, add `needs-rework:builder` | Link the fix ticket, return `waiting_on_blocker` |
@@ -133,7 +134,7 @@ The line ceiling was raised on 2026-09-23 for Opus 5.5, from 800 lines, on measu
 
 Re-apply the table to the refiner's body too, not only to your sketch: files named across packages, criteria, and deliverables in the story. You may find the work smaller than the estimate, never larger. Oversized work goes back for a split; there has been no larger tier since 2026-05-02.
 
-When the table is exceeded, read `handoffs.md` before acting. It has the split proposal, the depth check that stops splitting at two levels, and the floor rule that merges a slice with only one consumer back into its sibling even when that breaks a ceiling.
+When the table is exceeded, read `handoffs.md` before acting. It describes scope assessment. Do not create an unusable child or continue oversized work because of the ordinary depth limit.
 
 ### Check in-flight branches
 
@@ -320,6 +321,8 @@ Lessons learned are for the documentation stage, which folds them into the featu
 If you find a bug whose fix needs production code outside the ticket's scope, do not fix it here, even when it looks small and you have budget left. File it as its own ticket, mark the test that exposed it `@Ignore("blocked on #N: <summary>")`, link the bug in the PR, and finish your ticket. This holds when your own new test exposed an older bug in code outside your diff. An out-of-scope fix inflates the ticket past its sizing, lands a design the plan never had, which the verifier flags, and buries the fix under an unrelated title. Pyrycode #128 fixed a supervisor leak inside a small test ticket and exhausted its budget; #155 spent its last turns chasing a pre-existing race and shipped a failing test. The filing steps, including putting the ticket on the board, are in `handoffs.md`.
 
 ## Rework
+
+Reassess completed and remaining scope before editing. Follow `docs/builder-scope-handoff.md` when new work has expanded the ticket. Another attempt at the same defect normally stays with its regression.
 
 When the ticket comes back with `needs-rework:builder`, read the verifier's verdict comment on the PR first.
 
