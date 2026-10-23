@@ -23,6 +23,60 @@ class ScriptedSelectionTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 gate.scripted_selection(name)
 
+    def test_companion_methods_select_their_original_scenarios(self):
+        methods = [
+            ('session-error', 'interactiveTurn_sessionError_recoversDroppedAndRetainedBacklog'),
+            ('background-agent', 'interactiveTurn_seededChannel_earlierSessionAgent_survivesRestartAndSettlementReconnect'),
+            ('background-agent', 'interactiveTurn_seededChannel_backgroundAgentMovesAndSettles'),
+            ('ping', 'interactiveTurn_seededChannel_durableGapCatchUp'),
+            ('ping', 'interactiveTurn_seededChannel_streamsScriptedPingReplyIntoThread'),
+            ('stream', 'interactiveTurn_seededChannel_queuedPromptDoesNotSplitHeldReply'),
+        ]
+        self.assertEqual(gate.scripted_selection(','.join(CLASS + '#' + method for _, method in methods)),
+                         [(scenario, CLASS + '#' + method) for scenario, method in methods])
+
+    def test_multiple_selected_methods_run_the_original_scenario_once(self):
+        methods = ['interactiveTurn_seededChannel_durableGapCatchUp',
+                   'interactiveTurn_seededChannel_streamsScriptedPingReplyIntoThread']
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / 'app/build/outputs/androidTest-results/managedDevice/debug/pixel2Api33Atd'
+            reports.mkdir(parents=True)
+            evidence = root / 'evidence'
+            evidence.mkdir()
+            scenarios = []
+            def run(command, **kwargs):
+                scenarios.append(kwargs['env']['SCENARIO'])
+                cases = ''.join(f'<testcase classname="{CLASS}" name="{method}"/>' for method in methods)
+                (reports / 'TEST-ping.xml').write_text(f'<testsuite tests="2">{cases}</testsuite>')
+                return subprocess.CompletedProcess(command, 0)
+            with patch.object(gate, 'ROOT', root), patch.object(gate, 'managed_avd', return_value=None), \
+                 patch.object(gate, 'run_device_command', side_effect=run), patch.object(gate.signal, 'signal'), \
+                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                status = gate.run_scripted_all({}, evidence, 'pixel2Api33Atd',
+                                               [('ping', CLASS + '#' + method) for method in methods])
+            self.assertEqual(scenarios, ['ping'])
+            self.assertEqual(status, 0)
+
+    def test_companion_mapping_uses_guarded_data_and_rejects_executable_declarations(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(gate, 'ROOT', Path(directory)):
+            scripts = Path(directory) / 'scripts'
+            scripts.mkdir()
+            shell = scripts / 'e2e-emulator.sh'
+            shell.write_text('''if [ -n "${DETERMINISTIC}" ] && [ "${SCENARIO:-}" = "background-agent" ] && [ -z "${E2E_BACKGROUND_AGENT_CASE:-}" ]; then
+  exec python3 "${REPO_ROOT}/scripts/e2e-background-agent-scenarios.py"
+fi
+''')
+            runner = scripts / 'e2e-background-agent-scenarios.py'
+            runner.write_text("METHODS = {'restart': 'companionMethod'}\nraise RuntimeError('must never execute')\n")
+            self.assertEqual(gate.scripted_selection(CLASS + '#companionMethod'),
+                             [('background-agent', CLASS + '#companionMethod')])
+            for declaration in ["METHODS = load_methods()", "METHODS = {'restart': 'bad;method'}",
+                                "METHODS = {}", "METHODS = {'restart': 'companionMethod'}\nMETHODS = {}"]:
+                runner.write_text(declaration)
+                with self.subTest(declaration=declaration), self.assertRaises(ValueError):
+                    gate.scripted_selection(CLASS + '#companionMethod')
+
     def test_missing_or_changed_mapping_refuses_before_any_device_work(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(gate, 'ROOT', Path(directory)):
             with self.assertRaises(ValueError):

@@ -5,6 +5,7 @@ Build/harness output goes to stderr. Full original reports remain in the build
 directory; the dispatcher report contains test names and outcomes, not app logs.
 """
 import argparse
+import ast
 import contextlib
 import fcntl
 import json
@@ -637,13 +638,50 @@ def scripted_selection(value):
     except OSError as error:
         raise ValueError('scripted scenario declarations are unavailable') from error
     mappings = {}
+
+    def register(scenario, method):
+        if scenario not in SCENARIOS or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', method):
+            raise ValueError('invalid scripted scenario declaration')
+        name = prefix + method
+        if name in mappings and mappings[name] != scenario:
+            raise ValueError('scripted method has ambiguous scenario declarations')
+        mappings[name] = scenario
+
     for scenario, body in re.findall(r'^    ([a-z][a-z-]*)\)\n(.*?)^      ;;', source, re.MULTILINE | re.DOTALL):
         methods = re.findall(r'^      TEST_METHOD="([A-Za-z_][A-Za-z0-9_]*)"$', body, re.MULTILINE)
         if scenario in SCENARIOS and len(methods) == 1:
-            name = prefix + methods[0]
-            if name in mappings:
-                raise ValueError('scripted method has ambiguous scenario declarations')
-            mappings[name] = scenario
+            register(scenario, methods[0])
+
+    # Some scenarios add or replace their primary target after the case statement.
+    # Read only literal targets inside an explicit SCENARIO guard, never shell code.
+    for scenario, body in re.findall(
+            r'^  (?:if|elif) \[ "\$\{SCENARIO\}" = "([a-z][a-z-]*)" \][^\n]*; then\n(.*?)^  fi',
+            source, re.MULTILINE | re.DOTALL):
+        if scenario in SCENARIOS:
+            for method in re.findall(r'^    TEST_TARGET="(?:\$\{TEST_TARGET\},)?\$\{TEST_CLASS\}#([A-Za-z_][A-Za-z0-9_]*)"$',
+                                     body, re.MULTILINE):
+                register(scenario, method)
+
+    # Delegated scenarios keep their exact counted methods in a literal METHODS
+    # dictionary. Parse that data without importing or executing the runner.
+    for scenario, runner in re.findall(
+            r'^if \[ -n "\$\{DETERMINISTIC\}" \] && \[ "\$\{SCENARIO:-\}" = "([a-z][a-z-]*)" \][^\n]*; then\n'
+            r'  exec python3 "\$\{REPO_ROOT\}/scripts/(e2e-[a-z-]+\.py)"\nfi', source, re.MULTILINE):
+        if scenario not in SCENARIOS:
+            continue
+        try:
+            tree = ast.parse((ROOT / 'scripts' / runner).read_text())
+            declarations = [node.value for node in tree.body if isinstance(node, ast.Assign)
+                            and any(isinstance(target, ast.Name) and target.id == 'METHODS' for target in node.targets)]
+            if len(declarations) != 1:
+                raise ValueError('missing unique METHODS declaration')
+            methods = ast.literal_eval(declarations[0])
+            if not isinstance(methods, dict) or not methods or any(not isinstance(method, str) for method in methods.values()):
+                raise ValueError('invalid METHODS declaration')
+            for method in methods.values():
+                register(scenario, method)
+        except (OSError, SyntaxError, TypeError, ValueError) as error:
+            raise ValueError('scripted runner declarations are unavailable or invalid') from error
     if any(name not in mappings for name in names):
         raise ValueError('selected method is not a supported scripted scenario')
     return [(mappings[name], name) for name in dict.fromkeys(names)]
@@ -671,7 +709,7 @@ def run_scripted_all(env, run_dir, device, selection=None):
         if serial and granted is None:
             print("Android gate: scripted-all could not install the APKs once; each scenario installs its own",
                   file=sys.stderr)
-        scenarios = [scenario for scenario, _ in selection] if selection is not None else SCENARIOS
+        scenarios = list(dict.fromkeys(scenario for scenario, _ in selection)) if selection is not None else SCENARIOS
         for scenario in scenarios:
             scenario_env = {**env, "DETERMINISTIC": "1", "SCENARIO": scenario, "DEVICE": target}
             if serial:
