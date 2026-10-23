@@ -433,6 +433,51 @@ class AndroidGateTest(unittest.TestCase):
             self.assertFalse(any("testInstrumentationRunnerArguments.class=" in part for part in command))
             self.assertIn("-Pandroid.experimental.androidTest.numManagedDeviceShards=2", command)
 
+    def test_ui_gate_leaves_design_capture_classes_to_the_main_sweep(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.device_test(root, "de/pyryco/mobile/ui/KeyboardTest.kt")
+            self.device_test(root, "de/pyryco/mobile/design/ListDesignCaptureTest.kt",
+                             "@Test fun framesAt412() {}\n@Test fun compactFrames() {}")
+            self.device_test(root, "de/pyryco/mobile/ui/SidebarCaptureTest.kt",
+                             "@Test fun treeAt412() = capture()\n"
+                             "@PerTicketDeviceTest\n    @Test fun tapsOpenTheEditor() {}\n"
+                             "@Viewport(\"320x640\")\n@PerTicketDeviceTest\n@Test\nfun `keeps close reachable`() {}")
+            with patch.object(gate, "ROOT", root):
+                self.assertEqual(gate.per_ticket_selection(), [
+                    "de.pyryco.mobile.ui.KeyboardTest",
+                    "de.pyryco.mobile.ui.SidebarCaptureTest#tapsOpenTheEditor",
+                    "de.pyryco.mobile.ui.SidebarCaptureTest#keeps close reachable",
+                ])
+            _, command = self.ui_command(root, {})
+            selected = next(part for part in command if "testInstrumentationRunnerArguments.class=" in part)
+            self.assertNotIn("ListDesignCaptureTest", selected)
+            self.assertIn("de.pyryco.mobile.ui.SidebarCaptureTest#tapsOpenTheEditor", selected)
+            # The main sweep (UI_DEVICE_ALL=1) filters no class, so it still runs every capture.
+            _, command = self.ui_command(root, {"UI_DEVICE_ALL": "1"})
+            self.assertFalse(any("testInstrumentationRunnerArguments.class=" in part for part in command))
+            # A named rerun of a capture method, as the sweep baseline and focused builder runs use, runs it.
+            run = Mock(return_value=subprocess.CompletedProcess([], 0))
+            with patch.object(gate, "ROOT", root), \
+                    patch.dict(os.environ, {"ANDROID_USER_HOME": str(root)}, clear=True), \
+                    patch("sys.argv", ["android-test-gate.py", "ui", "--tests",
+                                       "de.pyryco.mobile.design.ListDesignCaptureTest#framesAt412"]), \
+                    patch.object(gate, "changed_paths", return_value=["app/src/main/X.kt"]), \
+                    patch.object(gate.subprocess, "run", run), patch.object(gate, "run_device_command", run), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                gate.main()
+            self.assertIn("-Pandroid.testInstrumentationRunnerArguments.class="
+                          "de.pyryco.mobile.design.ListDesignCaptureTest#framesAt412", run.call_args.args[0])
+
+    def test_a_misplaced_per_ticket_mark_fails_instead_of_dropping_its_test(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.device_test(root, "de/pyryco/mobile/ui/SidebarCaptureTest.kt",
+                             "@PerTicketDeviceTest\nval x = 1\n@Test fun treeAt412() = capture()")
+            result, command = self.ui_command(root, {})
+            self.assertEqual(result, 1)
+            self.assertIsNone(command)
+
     def test_ui_gate_refuses_an_empty_device_only_set(self):
         with tempfile.TemporaryDirectory() as tmp:
             result, command = self.ui_command(Path(tmp), {})

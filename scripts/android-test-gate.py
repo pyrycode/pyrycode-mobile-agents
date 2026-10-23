@@ -267,6 +267,43 @@ def device_only_classes():
     return [name for name in names if not name.startswith(E2E_PACKAGE + ".")]
 
 
+# Design captures run in the main sweep, not per ticket (Juhana, 2026-10-23). A class whose name ends in
+# CaptureTest is a design capture class: on the headless gate emulator a capture saves metadata only, the
+# design evidence comes from the separate Pixel 8 run, and captures took 64 percent of the per-ticket device
+# time (measured 2026-10-04). The sweep's UI_DEVICE_ALL run passes no class filter, so it keeps running them,
+# and a newly added ...CaptureTest class joins the sweep with no list to update. A method in a capture class
+# that checks behaviour and saves no frame carries @PerTicketDeviceTest and stays in the per-ticket run.
+CAPTURE_CLASS_SUFFIX = "CaptureTest"
+PER_TICKET_ANNOTATION = "@PerTicketDeviceTest"
+PER_TICKET_METHOD = re.compile(r"@PerTicketDeviceTest\b(?:\s*@\w+(?:\([^)]*\))?)*\s*fun\s+(`[^`]+`|\w+)\s*\(")
+
+
+def is_capture_class(name):
+    return name.rsplit(".", 1)[-1].endswith(CAPTURE_CLASS_SUFFIX)
+
+
+def per_ticket_methods(name):
+    """The @PerTicketDeviceTest methods of a capture class, as Class#method selectors.
+
+    Fails loudly when a mark is not directly on a function, so a misplaced mark cannot drop its test silently.
+    """
+    source = (ROOT / "app/src/androidTest/java" / Path(*name.split("."))).with_suffix(".kt").read_text()
+    methods = [method.strip("`") for method in PER_TICKET_METHOD.findall(source)]
+    marks = len(re.findall(re.escape(PER_TICKET_ANNOTATION) + r"\b", source))
+    if marks != len(methods):
+        raise ValueError(f"{name}: put each {PER_TICKET_ANNOTATION} directly on its test function")
+    return [f"{name}#{method}" for method in methods]
+
+
+def per_ticket_selection():
+    """What the verifier's per-ticket device step runs: every device-only class except the design capture
+    classes, plus the behaviour methods those classes mark @PerTicketDeviceTest."""
+    selection = []
+    for name in device_only_classes():
+        selection.extend(per_ticket_methods(name) if is_capture_class(name) else [name])
+    return selection
+
+
 def changed_paths(base="main"):
     """Tracked and untracked paths that differ from where this branch left base, or None when git cannot say."""
     try:
@@ -835,7 +872,11 @@ def main():
                    f"-Pandroid.experimental.androidTest.numManagedDeviceShards={shards}",
                    "-Pandroid.testInstrumentationRunnerArguments.disableAnimations=true", "--console=plain"]
         if ui_tests or not full:
-            classes = ui_tests or device_only_classes()
+            try:
+                classes = ui_tests or per_ticket_selection()
+            except (OSError, ValueError) as error:
+                print(f"Android gate failed: {error}", file=sys.stderr)
+                return 1
             if not classes:
                 print("Android gate: no device-only test classes found under app/src/androidTest", file=sys.stderr)
                 return 1
