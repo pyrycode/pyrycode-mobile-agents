@@ -9,6 +9,22 @@ scripted selections retain their complete coverage. See
 [verifier throughput](verifier-throughput.md) for measured costs, configuration
 and evidence requirements. Source-review overlap was already enabled.
 
+## Scripted companion selections, 2026-10-23
+
+Named comparisons retain the owning scenario for companion methods too: the
+ping catch-up method and the delegated background-agent and stream methods.
+The selector reads literal harness declarations without executing runner code.
+Several selected methods in one scenario run that scenario once, and every
+selected method must appear in fresh counted XML. Unselected companion failures
+still fail the scenario. Unknown, ambiguous or nonliteral declarations refuse
+before device execution. Full scripted coverage and existing deadlines remain.
+
+#2493 exposed the missing companion mappings: its original configured gate had
+24 executed, 19 passed and five failed, while both comparisons stopped before
+execution. Selector unit regressions reproduce that setup failure and duplicate
+scenario execution. Repairing selection establishes no product pass or failure
+cause; preserve those receipts and obtain normal independent acceptance.
+
 ## Captured client checks, 2026-10-16
 
 Mobile product PR 2195 promoted 71 captured scenarios into the normal device gate.
